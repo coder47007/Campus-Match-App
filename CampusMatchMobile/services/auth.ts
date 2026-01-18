@@ -173,6 +173,35 @@ export const authApi = {
         return { message: 'Password changed successfully' };
     },
 
+    // Reset password (step 2 of forgot password flow)
+    resetPassword: async (data: { email: string; token: string; newPassword: string }): Promise<{ message: string }> => {
+        // Try to verify the OTP (token) first which signs the user in
+        const { data: sessionData, error: verifyError } = await supabase.auth.verifyOtp({
+            email: data.email,
+            token: data.token,
+            type: 'recovery',
+        });
+
+        if (verifyError) {
+            throw new Error(verifyError.message);
+        }
+
+        if (!sessionData.session) {
+            throw new Error('Invalid or expired token');
+        }
+
+        // Once signed in, update the password
+        const { error: updateError } = await supabase.auth.updateUser({
+            password: data.newPassword,
+        });
+
+        if (updateError) {
+            throw new Error(updateError.message);
+        }
+
+        return { message: 'Password reset successfully' };
+    },
+
     // Delete account
     deleteAccount: async (): Promise<void> => {
         const { data: { user } } = await supabase.auth.getUser();

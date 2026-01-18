@@ -42,9 +42,8 @@ export default function ForgotPasswordScreen() {
                 'If an account exists with this email, you will receive a password reset token. Check the console output in development mode.',
                 [{ text: 'OK', onPress: () => setStep('reset') }]
             );
-        } catch (error: unknown) {
-            const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
-                || 'Failed to request reset. Please try again.';
+        } catch (error: any) {
+            const errorMessage = error.message || 'Failed to request reset. Please try again.';
             Alert.alert('Error', errorMessage);
         } finally {
             setIsLoading(false);
@@ -81,9 +80,8 @@ export default function ForgotPasswordScreen() {
                 'Your password has been reset successfully. Please login with your new password.',
                 [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
             );
-        } catch (error: unknown) {
-            const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
-                || 'Failed to reset password. Please try again.';
+        } catch (error: any) {
+            const errorMessage = error.message || 'Failed to reset password. Please try again.';
             Alert.alert('Error', errorMessage);
         } finally {
             setIsLoading(false);
