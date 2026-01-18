@@ -1,0 +1,11 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  CampusMatch.Shared -> C:\Users\salim\OneDrive\Desktop\RAD\CampusMatch\CampusMatch.Shared\bin\Debug\net8.0\CampusMatch.Shared.dll
+  CampusMatch.Client -> C:\Users\salim\OneDrive\Desktop\RAD\CampusMatch\CampusMatch.Client\bin\Debug\net10.0-windows\CampusMatch.Client.dll
+  CampusMatch.Api -> C:\Users\salim\OneDrive\Desktop\RAD\CampusMatch\CampusMatch.Api\bin\Debug\net8.0\CampusMatch.Api.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.04

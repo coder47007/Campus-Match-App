@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+.expo/
+dist/
+build/
+*.apk
+*.aab
+*.ipa
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.vs/
+
+# C# / .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android specific
+android/.gradle/
+android/app/build/
+android/build/
+android/.cxx/
+*.keystore
+!debug.keystore
+
+# iOS specific
+ios/Pods/
+ios/build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# Misc
+*.tgz
+.cache/
+errors.txt

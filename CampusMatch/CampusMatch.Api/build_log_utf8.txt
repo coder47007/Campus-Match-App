@@ -1,0 +1,12 @@
+﻿  Determining projects to restore...
+  All projects are up-to-date for restore.
+  CampusMatch.Shared -> D:\College\Projects\Mobile Apps\CampusMatch (2)\CampusMatch\CampusMatch.Shared\bin\Debug\net8.0\CampusMatch.Shared.dll
+D:\College\Projects\Mobile Apps\CampusMatch (2)\CampusMatch\CampusMatch.Api\Controllers\AuthController.cs(353,37): error CS1061: 'ClaimsPrincipal' does not contain a definition for 'FindFirstValue' and no accessible extension method 'FindFirstValue' accepting a first argument of type 'ClaimsPrincipal' could be found (are you missing a using directive or an assembly reference?) [D:\College\Projects\Mobile Apps\CampusMatch (2)\CampusMatch\CampusMatch.Api\CampusMatch.Api.csproj]
+
+Build FAILED.
+
+D:\College\Projects\Mobile Apps\CampusMatch (2)\CampusMatch\CampusMatch.Api\Controllers\AuthController.cs(353,37): error CS1061: 'ClaimsPrincipal' does not contain a definition for 'FindFirstValue' and no accessible extension method 'FindFirstValue' accepting a first argument of type 'ClaimsPrincipal' could be found (are you missing a using directive or an assembly reference?) [D:\College\Projects\Mobile Apps\CampusMatch (2)\CampusMatch\CampusMatch.Api\CampusMatch.Api.csproj]
+    0 Warning(s)
+    1 Error(s)
+
+Time Elapsed 00:00:05.00
