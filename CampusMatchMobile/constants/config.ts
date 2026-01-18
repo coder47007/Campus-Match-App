@@ -1,10 +1,10 @@
 import Constants from 'expo-constants';
 
-// API Configuration
-// Change this to your API server URL when testing on physical devices
-// For Android emulator: use 10.0.2.2 instead of localhost
-// For iOS simulator: localhost works fine
-// For physical devices: use your computer's IP address on the network
+// Supabase Configuration - Direct connection (no backend needed)
+export const SUPABASE_URL = 'https://urtynghfmszehjwvligg.supabase.co';
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydHluZ2hmbXN6ZWhqd3ZsaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDk2MDEsImV4cCI6MjA4Mzk4NTYwMX0.nLQd8gmmRH76HaYZ4kkOTbwTnm8EiOtdJ6GF9aHuEuA';
+
+// Legacy API Configuration (kept for reference, not used)
 const extra = Constants.expoConfig?.extra;
 export const API_BASE_URL = extra?.apiUrl || 'http://10.0.0.56:5229';
 

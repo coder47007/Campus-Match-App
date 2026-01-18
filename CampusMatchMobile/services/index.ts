@@ -1,5 +1,6 @@
 // Export all services
 
+export { supabase, getCurrentUserId, getCurrentSession } from './supabase';
 export { apiService, api, setAuthToken, loadStoredToken, getAuthToken } from './api';
 export { signalRService } from './signalr';
 export { authApi } from './auth';
