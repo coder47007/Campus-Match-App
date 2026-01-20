@@ -53,7 +53,7 @@ export default function DeleteAccountScreen() {
     const performDelete = async () => {
         setIsLoading(true);
         try {
-            await authApi.deleteAccount({ password });
+            await authApi.deleteAccount();
             await logout();
             router.replace('/(auth)/login');
         } catch (err: unknown) {

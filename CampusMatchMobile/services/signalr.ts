@@ -23,18 +23,15 @@ class SignalRService {
     // Initialize and start connection
     async start(): Promise<void> {
         if (this.connection?.state === signalR.HubConnectionState.Connected) {
-            console.log('SignalR already connected');
             return;
         }
 
         if (this.isConnecting) {
-            console.log('SignalR connection already in progress');
             return;
         }
 
         const token = getAuthToken();
         if (!token) {
-            console.log('No auth token available for SignalR');
             return;
         }
 
@@ -61,7 +58,6 @@ class SignalRService {
 
             // Start connection
             await this.connection.start();
-            console.log('SignalR connected successfully');
             this.reconnectAttempts = 0;
         } catch (error) {
             console.error('SignalR connection error:', error);
@@ -80,9 +76,8 @@ class SignalRService {
         if (this.connection) {
             try {
                 await this.connection.stop();
-                console.log('SignalR disconnected');
             } catch (error) {
-                console.error('Error stopping SignalR:', error);
+                // Connection stop failed silently
             }
             this.connection = null;
         }
@@ -94,13 +89,11 @@ class SignalRService {
 
         // Handle incoming messages
         this.connection.on('ReceiveMessage', (message: MessageDto) => {
-            console.log('Received message:', message);
             this.messageHandlers.forEach(handler => handler(message));
         });
 
         // Handle new matches
         this.connection.on('NewMatch', (match: MatchDto) => {
-            console.log('New match:', match);
             this.matchHandlers.forEach(handler => handler(match));
         });
 
@@ -115,16 +108,16 @@ class SignalRService {
         });
 
         // Handle connection events
-        this.connection.onreconnecting((error) => {
-            console.log('SignalR reconnecting...', error);
+        this.connection.onreconnecting(() => {
+            // Reconnecting
         });
 
-        this.connection.onreconnected((connectionId) => {
-            console.log('SignalR reconnected:', connectionId);
+        this.connection.onreconnected(() => {
+            // Reconnected
         });
 
-        this.connection.onclose((error) => {
-            console.log('SignalR disconnected:', error);
+        this.connection.onclose(() => {
+            // Connection closed
         });
     }
 

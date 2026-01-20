@@ -51,7 +51,7 @@ export default function ChatScreen() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [showGifPicker, setShowGifPicker] = useState(false);
     const [showLocationPicker, setShowLocationPicker] = useState(false);
-    const typingTimeoutRef = useRef<NodeJS.Timeout>();
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const sendButtonScale = useRef(new Animated.Value(1)).current;
 
     const matchIdNum = parseInt(matchId || '0');
@@ -212,7 +212,7 @@ export default function ChatScreen() {
     if (!match) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={[styles.container, styles.centerContent]}
             >
                 <Text style={styles.errorText}>Match not found</Text>
@@ -282,7 +282,7 @@ export default function ChatScreen() {
                 }
             />
             < LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <KeyboardAvoidingView

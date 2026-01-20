@@ -86,7 +86,6 @@ export const spotsApi = {
             .single();
 
         if (existing) {
-            console.log('Already checked in to this spot');
             return true;
         }
 
@@ -109,7 +108,7 @@ export const spotsApi = {
             return false;
         }
 
-        console.log('Checked in successfully');
+
         return true;
     },
 
@@ -130,7 +129,7 @@ export const spotsApi = {
             return false;
         }
 
-        console.log('Checked out successfully');
+
         return true;
     },
 

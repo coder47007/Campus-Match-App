@@ -90,7 +90,7 @@ export const eventsApi = {
                 if (!matches?.length) return;
 
                 // Collect IDs of people to notify
-                const recipientIds = matches.map(m =>
+                const recipientIds = (matches as { Student1Id: number; Student2Id: number }[]).map(m =>
                     m.Student1Id === studentId ? m.Student2Id : m.Student1Id
                 );
 
@@ -104,12 +104,14 @@ export const eventsApi = {
                 if (!recipients?.length) return;
 
                 // Send Push Notifications via Expo API
-                const notifications = recipients.map(r => ({
+                const creatorName = (data as any)?.Creator?.Name || 'Someone';
+                const eventId = (data as any)?.Id;
+                const notifications = (recipients as { PushNotificationToken: string }[]).map(r => ({
                     to: r.PushNotificationToken,
-                    sound: 'default',
-                    title: `New Vibe: ${data.Creator.Name}`,
-                    body: `${data.Creator.Name} is at ${location}: "${title}"`,
-                    data: { eventId: data.Id, type: 'new_event' },
+                    sound: 'default' as const,
+                    title: `New Vibe: ${creatorName}`,
+                    body: `${creatorName} is at ${location}: "${title}"`,
+                    data: { eventId, type: 'new_event' },
                 }));
 
                 await fetch('https://exp.host/--/api/v2/push/send', {
@@ -122,7 +124,7 @@ export const eventsApi = {
                     body: JSON.stringify(notifications),
                 });
 
-                console.log(`Sent ${notifications.length} notifications for new event`);
+
 
             } catch (err) {
                 console.error('Failed to send event notifications:', err);
@@ -136,7 +138,7 @@ export const eventsApi = {
     deleteEvent: async (eventId: number): Promise<boolean> => {
         const studentId = await getStudentId();
 
-        console.log(`[deleteEvent] Attempting to delete Event ${eventId} for Student ${studentId}`);
+
 
         const { error } = await supabase
             .from('Events')
@@ -151,7 +153,7 @@ export const eventsApi = {
             return false;
         }
 
-        console.log('[deleteEvent] Successfully deleted event');
+
         return true;
     }
 };

@@ -109,12 +109,12 @@ export default function DiscoverScreen() {
     if (isLoading && profiles.length === 0) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.centerContent}>
-                        <ActivityIndicator size="large" color="#7C3AED" />
+                        <ActivityIndicator size="large" color={Colors.primary.gradient[2]} />
                         <Text style={styles.loadingText}>Finding matches...</Text>
                     </View>
                 </SafeAreaView>
@@ -125,7 +125,7 @@ export default function DiscoverScreen() {
     if (error) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
@@ -133,9 +133,9 @@ export default function DiscoverScreen() {
                         <Ionicons name="cloud-offline-outline" size={64} color={Colors.dark.textMuted} />
                         <Text style={styles.errorTitle}>Connection Issue</Text>
                         <Text style={styles.errorText}>{error}</Text>
-                        <TouchableOpacity style={styles.retryButton} onPress={fetchProfiles}>
+                        <TouchableOpacity style={styles.retryButton} onPress={() => fetchProfiles()}>
                             <LinearGradient
-                                colors={['#7C3AED', '#6D28D9']}
+                                colors={[Colors.primary.gradient[2], Colors.secondary.dark]}
                                 style={styles.retryGradient}
                             >
                                 <Text style={styles.retryText}>Try Again</Text>
@@ -150,7 +150,7 @@ export default function DiscoverScreen() {
     if (!currentProfile) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
@@ -190,7 +190,7 @@ export default function DiscoverScreen() {
 
     return (
         <LinearGradient
-            colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+            colors={Colors.gradients.dark}
             style={styles.container}
         >
             <SafeAreaView style={styles.safeArea}>

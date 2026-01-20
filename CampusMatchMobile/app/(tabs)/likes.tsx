@@ -116,12 +116,12 @@ export default function LikesScreen() {
     if (isLoading) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.centerContent}>
-                        <ActivityIndicator size="large" color="#7C3AED" />
+                        <ActivityIndicator size="large" color={Colors.primary.gradient[2]} />
                     </View>
                 </SafeAreaView>
             </LinearGradient>
@@ -130,7 +130,7 @@ export default function LikesScreen() {
 
     return (
         <LinearGradient
-            colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+            colors={Colors.gradients.dark}
             style={styles.container}
         >
             <SafeAreaView style={styles.safeArea}>
@@ -139,6 +139,9 @@ export default function LikesScreen() {
                     <TouchableOpacity
                         style={styles.headerIcon}
                         onPress={() => Alert.alert('Filter', 'Filter options coming soon!')}
+                        accessible={true}
+                        accessibilityLabel="Filter likes"
+                        accessibilityRole="button"
                     >
                         <Ionicons name="options-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
@@ -148,6 +151,9 @@ export default function LikesScreen() {
                     <TouchableOpacity
                         style={styles.headerIcon}
                         onPress={() => router.push('/profile')}
+                        accessible={true}
+                        accessibilityLabel="View profile"
+                        accessibilityRole="button"
                     >
                         <Ionicons name="person-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
@@ -177,9 +183,12 @@ export default function LikesScreen() {
                                     ]
                                 );
                             }}
+                            accessible={true}
+                            accessibilityLabel="Upgrade to premium to see all likes"
+                            accessibilityRole="button"
                         >
                             <LinearGradient
-                                colors={['#7C3AED', '#6D28D9']}
+                                colors={[Colors.primary.gradient[2], Colors.secondary.dark]}
                                 style={styles.premiumGradient}
                             >
                                 <Ionicons name="diamond" size={20} color={Colors.white} />

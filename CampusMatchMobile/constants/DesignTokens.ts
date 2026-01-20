@@ -136,3 +136,63 @@ export const Shadows = {
         elevation: 12,
     },
 } as const;
+
+/**
+ * Animation Durations (ms)
+ * Use for consistent timing across transitions
+ */
+export const Animation = {
+    instant: 100,
+    fast: 200,
+    normal: 300,
+    slow: 500,
+} as const;
+
+/**
+ * Sizing System
+ * Use for buttons, inputs, avatars, and touch targets
+ */
+export const Sizing = {
+    /** Minimum touch target for accessibility (44x44) */
+    touchTarget: 44,
+
+    icon: {
+        sm: 18,
+        md: 22,
+        lg: 24,
+        xl: 28,
+    },
+
+    avatar: {
+        sm: 40,
+        md: 56,
+        lg: 80,
+        xl: 112,
+    },
+
+    button: {
+        sm: 36,
+        md: 44,
+        lg: 52,
+    },
+
+    input: {
+        sm: 40,
+        md: 48,
+        lg: 56,
+    },
+} as const;
+
+/**
+ * Accessibility
+ * Constants and defaults for a11y compliance
+ */
+export const Accessibility = {
+    /** Minimum touch target size (WCAG 2.1 Level AAA) */
+    minTouchTarget: 44,
+    /** Minimum contrast ratio for normal text */
+    minContrastRatio: 4.5,
+    /** Minimum contrast ratio for large text */
+    minLargeTextContrastRatio: 3,
+} as const;
+

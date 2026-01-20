@@ -111,12 +111,12 @@ export default function MatchesScreen() {
     if (isLoading && matches.length === 0) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
                     <View style={styles.centerContent}>
-                        <ActivityIndicator size="large" color="#7C3AED" />
+                        <ActivityIndicator size="large" color={Colors.primary.gradient[2]} />
                     </View>
                 </SafeAreaView>
             </LinearGradient>
@@ -126,7 +126,7 @@ export default function MatchesScreen() {
     if (matches.length === 0) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
@@ -199,7 +199,7 @@ export default function MatchesScreen() {
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7C3AED" />
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary.gradient[2]} />
                     }
                 >
                     {/* New Matches Section */}

@@ -49,7 +49,6 @@ export default function ExploreScreen() {
         }
 
         const id = await getStudentId();
-        console.log('ExploreScreen: Current Student ID is:', id);
         setCurrentStudentId(id);
     };
 
@@ -101,7 +100,6 @@ export default function ExploreScreen() {
                     text: "Delete",
                     style: "destructive",
                     onPress: async () => {
-                        console.log('Deleting event:', eventId);
                         const success = await eventsApi.deleteEvent(eventId);
                         if (success) {
                             setEvents(prev => prev.filter(e => e.Id !== eventId));
@@ -136,7 +134,7 @@ export default function ExploreScreen() {
 
     return (
         <LinearGradient
-            colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+            colors={Colors.gradients.dark}
             style={styles.container}
         >
             <SafeAreaView style={styles.safeArea}>
@@ -153,7 +151,7 @@ export default function ExploreScreen() {
                     </View>
                     <TouchableOpacity style={styles.createButton} onPress={() => setShowEventModal(true)}>
                         <LinearGradient
-                            colors={['#7C3AED', '#6D28D9']}
+                            colors={[Colors.primary.gradient[2], Colors.secondary.dark]}
                             style={styles.createButtonGradient}
                         >
                             <Ionicons name="add" size={24} color={Colors.white} />

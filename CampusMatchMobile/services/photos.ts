@@ -30,9 +30,7 @@ export const photosApi = {
 
     // Upload a photo to Supabase Storage
     uploadPhoto: async (uri: string, mimeType: string = 'image/jpeg'): Promise<PhotoDto> => {
-        console.log('[Photo Upload] Starting upload...');
         const studentId = await getStudentId();
-        console.log('[Photo Upload] Student ID:', studentId);
 
         if (!studentId) throw new Error('Not authenticated');
 
@@ -41,16 +39,12 @@ export const photosApi = {
             const fileExt = mimeType.split('/')[1] || 'jpg';
             const fileName = `${studentId}_${Date.now()}.${fileExt}`;
             const filePath = `profiles/${fileName}`;
-            console.log('[Photo Upload] File path:', filePath);
 
             // Fetch the file as ArrayBuffer (better for React Native)
-            console.log('[Photo Upload] Fetching file from URI:', uri);
             const response = await fetch(uri);
             const arrayBuffer = await response.arrayBuffer();
-            console.log('[Photo Upload] File size:', arrayBuffer.byteLength, 'bytes');
 
             // Upload to Supabase Storage using ArrayBuffer
-            console.log('[Photo Upload] Uploading to Supabase Storage...');
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('photos')
                 .upload(filePath, arrayBuffer, {
@@ -59,11 +53,8 @@ export const photosApi = {
                 });
 
             if (uploadError) {
-                console.error('[Photo Upload] Upload error:', uploadError);
-                console.error('[Photo Upload] Error details:', JSON.stringify(uploadError, null, 2));
                 throw uploadError;
             }
-            console.log('[Photo Upload] Upload successful!', uploadData);
 
             // Get public URL
             const { data: { publicUrl } } = supabase.storage

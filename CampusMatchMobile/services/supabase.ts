@@ -69,7 +69,6 @@ export const getStudentId = async (): Promise<number | null> => {
     }
 
     // If profile missing (e.g. registration error), auto-create it now
-    console.log('Auto-creating missing profile for:', user.email);
 
     const { data: newProfile, error: createError } = await supabase
         .from('Students')

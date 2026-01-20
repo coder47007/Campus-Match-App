@@ -231,7 +231,7 @@ export default function ProfileScreen() {
     if (!user) {
         return (
             <LinearGradient
-                colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
+                colors={Colors.gradients.dark}
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
