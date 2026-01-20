@@ -1,5 +1,5 @@
 // Swipes service using Supabase directly
-import { supabase, getCurrentUserId } from './supabase';
+import { supabase, getCurrentUserId, getStudentId } from './supabase';
 import {
     SwipeRequest,
     SwipeResponse,
@@ -11,19 +11,19 @@ import {
 export const swipesApi = {
     // Create a swipe (like/dislike/super like)
     swipe: async (data: SwipeRequest): Promise<SwipeResponse> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        if (!studentId) throw new Error('Student profile not found');
 
         // Insert the swipe
         const { error } = await supabase
             .from('Swipes')
-            .insert({
-                SwiperId: userId,
+            .upsert({
+                SwiperId: studentId,
                 SwipedId: data.swipedId,
                 IsLike: data.isLike,
                 IsSuperLike: data.isSuperLike || false,
                 CreatedAt: new Date().toISOString(),
-            });
+            }, { onConflict: 'SwiperId,SwipedId' });
 
         if (error) throw new Error(error.message);
 
@@ -34,7 +34,7 @@ export const swipesApi = {
                 .from('Swipes')
                 .select('*')
                 .eq('SwiperId', data.swipedId)
-                .eq('SwipedId', userId)
+                .eq('SwipedId', studentId)
                 .eq('IsLike', true)
                 .single();
 
@@ -43,7 +43,7 @@ export const swipesApi = {
                 const { data: newMatch, error: matchError } = await supabase
                     .from('Matches')
                     .insert({
-                        Student1Id: userId,
+                        Student1Id: studentId,
                         Student2Id: data.swipedId,
                         MatchedAt: new Date().toISOString(),
                         IsActive: true,
@@ -80,14 +80,14 @@ export const swipesApi = {
 
     // Undo last swipe (rewind)
     undoSwipe: async (): Promise<UndoSwipeResponse> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        if (!studentId) throw new Error('Student profile not found');
 
         // Get last swipe
         const { data: lastSwipe, error: fetchError } = await supabase
             .from('Swipes')
             .select('*')
-            .eq('SwiperId', userId)
+            .eq('SwiperId', studentId)
             .order('CreatedAt', { ascending: false })
             .limit(1)
             .single();
@@ -110,7 +110,7 @@ export const swipesApi = {
         await supabase
             .from('Matches')
             .delete()
-            .or(`and(Student1Id.eq.${userId},Student2Id.eq.${lastSwipe.SwipedId}),and(Student1Id.eq.${lastSwipe.SwipedId},Student2Id.eq.${userId})`);
+            .or(`and(Student1Id.eq.${studentId},Student2Id.eq.${lastSwipe.SwipedId}),and(Student1Id.eq.${lastSwipe.SwipedId},Student2Id.eq.${studentId})`);
 
         return { success: true };
     },

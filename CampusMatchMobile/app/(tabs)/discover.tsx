@@ -18,6 +18,7 @@ import { useDiscoverStore } from '@/stores/discoverStore';
 import SwipeCard from '@/components/SwipeCard';
 import MatchPopup from '@/components/MatchPopup';
 import FilterModal, { FilterState } from '@/components/FilterModal';
+import EmptyState from '@/components/ui/EmptyState';
 import Colors from '@/constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -60,7 +61,13 @@ export default function DiscoverScreen() {
         const isLike = direction === 'right';
         const isSuperLike = direction === 'up';
 
-        await swipe(currentProfile.id, isLike || isSuperLike, isSuperLike);
+        try {
+            await swipe(currentProfile.id, isLike || isSuperLike, isSuperLike);
+        } catch (err: any) {
+            console.error('Swipe error ignored:', err.message);
+            // Do not block UI, just log it. The swipe optimistic update will handle it.
+            // If we set 'setError', it shows the "Cloud Offline" screen which blocks usage.
+        }
     };
 
     const handleAction = (action: 'pass' | 'superlike' | 'like') => {
@@ -147,34 +154,34 @@ export default function DiscoverScreen() {
                 style={styles.container}
             >
                 <SafeAreaView style={styles.safeArea}>
-                    <View style={styles.centerContent}>
-                        {/* Empty state content */}
-                        <View style={styles.emptyCircle}>
-                            <Ionicons name="search" size={50} color={Colors.dark.textMuted} />
+                    <EmptyState
+                        icon="heart-dislike-outline"
+                        title="No More Profiles"
+                        description="We've run out of people to show you. Check back later or adjust your filters."
+                        action={{
+                            label: "Refresh",
+                            onPress: () => fetchProfiles()
+                        }}
+                        style={styles.centerContent}
+                    />
+
+                    {/* Optional: Keep notification toggle if desired */}
+                    <View style={styles.notifyContainer}>
+                        <View style={styles.notifyRow}>
+                            <Text style={styles.notifyLabel}>Notify me when new students join</Text>
+                            <Switch
+                                value={notifyNewStudents}
+                                onValueChange={setNotifyNewStudents}
+                                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                                thumbColor={notifyNewStudents ? "#660c6c" : "#f4f3f4"}
+                                accessible={true}
+                                accessibilityLabel="Toggle notifications for new students"
+                                accessibilityRole="switch"
+                            />
                         </View>
-                        <Text style={styles.emptyTitle}>No More Profiles</Text>
-                        <Text style={styles.emptyText}>
-                            We've run out of people to show you. Check back later or adjust your filters.
+                        <Text style={styles.notifyInfo}>
+                            We'll send you a push notification when we find people who match your preferences.
                         </Text>
-
-                        <View style={styles.notifyContainer}>
-                            <View style={styles.notifyRow}>
-                                <Text style={styles.notifyLabel}>Notify me when new students join</Text>
-                                <Switch
-                                    value={notifyNewStudents}
-                                    onValueChange={setNotifyNewStudents}
-                                    trackColor={{ false: "#767577", true: "#81b0ff" }}
-                                    thumbColor={notifyNewStudents ? "#660c6c" : "#f4f3f4"}
-                                />
-                            </View>
-                            <Text style={styles.notifyInfo}>
-                                We'll send you a push notification when we find people who match your preferences.
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity style={styles.refreshButton} onPress={fetchProfiles}>
-                            <Text style={styles.refreshButtonText}>Refresh</Text>
-                        </TouchableOpacity>
                     </View>
                 </SafeAreaView>
             </LinearGradient>
@@ -199,10 +206,16 @@ export default function DiscoverScreen() {
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerTitle}>Discover</Text>
                     </View>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => router.push('/(tabs)/profile')}
+                        accessible={true}
+                        accessibilityLabel="View profile"
+                    >
                         <Ionicons name="person-outline" size={22} color={Colors.white} />
                         <View style={styles.notificationDot} />
                     </TouchableOpacity>
+
                 </View>
 
                 {/* Card Stack */}
@@ -309,7 +322,7 @@ export default function DiscoverScreen() {
                     initialFilters={filters || undefined}
                 />
             </SafeAreaView>
-        </LinearGradient>
+        </LinearGradient >
     );
 }
 

@@ -16,6 +16,10 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import EmojiPicker from 'rn-emoji-keyboard';
+import * as ImagePicker from 'expo-image-picker';
+import GifPicker from '@/components/GifPicker';
+import LocationPicker from '@/components/LocationPicker';
 import { useChatStore } from '@/stores/chatStore';
 import { useMatchStore } from '@/stores/matchStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -44,6 +48,9 @@ export default function ChatScreen() {
 
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showGifPicker, setShowGifPicker] = useState(false);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
     const typingTimeoutRef = useRef<NodeJS.Timeout>();
     const sendButtonScale = useRef(new Animated.Value(1)).current;
 
@@ -304,8 +311,32 @@ export default function ChatScreen() {
                     {/* Modern Input Bar */}
                     <View style={styles.inputContainer}>
                         <View style={styles.inputWrapper}>
-                            <TouchableOpacity style={styles.attachButton}>
-                                <Ionicons name="add-circle" size={26} color={Colors.dark.textMuted} />
+                            <TouchableOpacity
+                                style={styles.attachButton}
+                                onPress={async () => {
+                                    const result = await ImagePicker.launchImageLibraryAsync({
+                                        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                        allowsEditing: true,
+                                        quality: 0.8,
+                                    });
+                                    if (!result.canceled && result.assets[0]) {
+                                        // For now, insert the image as a message placeholder
+                                        // TODO: Upload image to backend and send as image message
+                                        Alert.alert(
+                                            'Photo Selected!',
+                                            'Photo sharing will be available once backend integration is complete.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }
+                                }}
+                            >
+                                <Ionicons name="image-outline" size={24} color={Colors.dark.textMuted} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.attachButton}
+                                onPress={() => setShowLocationPicker(true)}
+                            >
+                                <Ionicons name="location-outline" size={24} color={Colors.dark.textMuted} />
                             </TouchableOpacity>
                             <TextInput
                                 style={styles.input}
@@ -316,8 +347,17 @@ export default function ChatScreen() {
                                 multiline
                                 maxLength={5000}
                             />
-                            <TouchableOpacity style={styles.emojiButton}>
+                            <TouchableOpacity
+                                style={styles.emojiButton}
+                                onPress={() => setShowEmojiPicker(true)}
+                            >
                                 <Ionicons name="happy-outline" size={24} color={Colors.dark.textMuted} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.emojiButton}
+                                onPress={() => setShowGifPicker(true)}
+                            >
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.dark.textMuted }}>GIF</Text>
                             </TouchableOpacity>
                         </View>
                         <Animated.View style={{ transform: [{ scale: sendButtonScale }] }}>
@@ -347,6 +387,61 @@ export default function ChatScreen() {
                         </Animated.View>
                     </View>
                 </KeyboardAvoidingView>
+
+                {/* Emoji Picker */}
+                <EmojiPicker
+                    onEmojiSelected={(emoji: { emoji: string }) => {
+                        setInputText(prev => prev + emoji.emoji);
+                    }}
+                    open={showEmojiPicker}
+                    onClose={() => setShowEmojiPicker(false)}
+                    theme={{
+                        backdrop: '#00000080',
+                        knob: '#7C3AED',
+                        container: '#1E1E2E',
+                        header: '#7C3AED',
+                        skinTonesContainer: '#2D2D44',
+                        category: {
+                            icon: '#FFFFFF',
+                            iconActive: '#7C3AED',
+                            container: '#2D2D44',
+                            containerActive: '#3D3D54',
+                        },
+                        search: {
+                            background: '#2D2D44',
+                            text: '#FFFFFF',
+                            placeholder: '#888888',
+                        },
+                        emoji: {
+                            selected: '#7C3AED30',
+                        },
+                    }}
+                />
+
+                {/* GIF Picker */}
+                <GifPicker
+                    visible={showGifPicker}
+                    onClose={() => setShowGifPicker(false)}
+                    onSelect={(gifUrl: string) => {
+                        // For now, insert the GIF URL as a message
+                        // TODO: Proper GIF message type in backend
+                        setInputText(prev => prev + (prev ? ' ' : '') + gifUrl);
+                    }}
+                />
+
+                {/* Location Picker */}
+                <LocationPicker
+                    visible={showLocationPicker}
+                    onClose={() => setShowLocationPicker(false)}
+                    onSelect={(location) => {
+                        // Format location as Google Maps link
+                        const mapUrl = `https://maps.google.com/?q=${location.latitude},${location.longitude}`;
+                        const locationMessage = location.address
+                            ? `📍 ${location.address}\n${mapUrl}`
+                            : `📍 My Location\n${mapUrl}`;
+                        setInputText(prev => prev + (prev ? '\n' : '') + locationMessage);
+                    }}
+                />
             </LinearGradient >
         </>
     );

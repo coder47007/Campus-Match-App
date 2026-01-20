@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMatchStore } from '@/stores/matchStore';
 import { MatchDto } from '@/types';
 import Colors from '@/constants/Colors';
+import EmptyState from '@/components/ui/EmptyState';
 
 export default function MatchesScreen() {
     const router = useRouter();
@@ -131,26 +132,36 @@ export default function MatchesScreen() {
                 <SafeAreaView style={styles.safeArea}>
                     {/* Header */}
                     <View style={styles.header}>
-                        <TouchableOpacity style={styles.headerIcon}>
+                        <TouchableOpacity
+                            style={styles.headerIcon}
+                            onPress={() => router.push('/settings')}
+                            accessible={true}
+                            accessibilityLabel="Settings"
+                        >
                             <Ionicons name="options-outline" size={22} color={Colors.white} />
                         </TouchableOpacity>
                         <View style={styles.headerTitleContainer}>
                             <Text style={styles.headerTitle}>Matches & Messages</Text>
                         </View>
-                        <TouchableOpacity style={styles.headerIcon}>
+                        <TouchableOpacity
+                            style={styles.headerIcon}
+                            onPress={() => router.push('/(tabs)/profile')}
+                            accessible={true}
+                            accessibilityLabel="View profile"
+                        >
                             <Ionicons name="person-outline" size={22} color={Colors.white} />
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.centerContent}>
-                        <View style={styles.emptyIcon}>
-                            <Ionicons name="chatbubbles" size={40} color="#7C3AED" />
-                        </View>
-                        <Text style={styles.emptyTitle}>No Matches Yet</Text>
-                        <Text style={styles.emptySubtitle}>
-                            Keep swiping to find your{'\n'}perfect match!
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="chatbubbles-outline"
+                        title="No Matches Yet"
+                        description="Keep swiping to find your perfect match!"
+                        action={{
+                            label: "Start Swiping",
+                            onPress: () => router.push('/(tabs)/discover')
+                        }}
+                    />
                 </SafeAreaView>
             </LinearGradient>
         );
@@ -164,13 +175,23 @@ export default function MatchesScreen() {
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => router.push('/settings')}
+                        accessible={true}
+                        accessibilityLabel="Settings"
+                    >
                         <Ionicons name="options-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerTitle}>Matches & Messages</Text>
                     </View>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => router.push('/(tabs)/profile')}
+                        accessible={true}
+                        accessibilityLabel="View profile"
+                    >
                         <Ionicons name="person-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
                 </View>

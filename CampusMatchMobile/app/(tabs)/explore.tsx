@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,72 +7,130 @@ import {
     TouchableOpacity,
     Image,
     SafeAreaView,
+    RefreshControl,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/Colors';
+import { eventsApi, spotsApi } from '@/services';
+import { TrendingSpot } from '@/services/spots';
+import EventModal from '@/components/EventModal';
+import SpotDetailModal from '@/components/SpotDetailModal';
 
-// Mock data for campus spots
-const trendingSpots = [
-    {
-        id: 1,
-        name: 'The Daily Grind',
-        type: 'Coffee Shop',
-        studentCount: 25,
-        image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400',
-    },
-    {
-        id: 2,
-        name: 'Main Library, 4th Floor',
-        type: 'Quiet Study',
-        studentCount: 42,
-        image: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=400',
-    },
-    {
-        id: 3,
-        name: 'Student Union',
-        type: 'Social Hub',
-        studentCount: 78,
-        image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400',
-    },
-];
+// CampusEvent type
+interface CampusEvent {
+    Id: number;
+    Title: string;
+    Location: string;
+    StartTime: string;
+    CreatorId: number;
+    Creator?: { Name: string; PhotoUrl?: string };
+}
 
-// Mock data for campus events
-const campusEvents = [
-    {
-        id: 1,
-        name: 'Trivia Night @ The Pub',
-        location: 'Deen',
-        date: new Date(2024, 11, 23),
-        time: '11:30 pm',
-        image: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=400',
-    },
-    {
-        id: 2,
-        name: 'Game Day Tailgate',
-        location: 'Deen',
-        date: new Date(2025, 0, 25),
-        time: '11:30 am',
-        image: 'https://images.unsplash.com/photo-1461896836934- voices-28da8dc?w=400',
-    },
-    {
-        id: 3,
-        name: 'Study Group Meetup',
-        location: 'Library',
-        date: new Date(2025, 0, 15),
-        time: '2:00 pm',
-        image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400',
-    },
-];
 
 export default function ExploreScreen() {
-    const formatDate = (date: Date) => {
+    const [events, setEvents] = useState<CampusEvent[]>([]);
+    const [spots, setSpots] = useState<TrendingSpot[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [showSpotModal, setShowSpotModal] = useState(false);
+    const [selectedSpot, setSelectedSpot] = useState<TrendingSpot | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [currentStudentId, setCurrentStudentId] = useState<number | null>(null);
+
+    // Load current user ID to check ownership
+    const loadUserId = async (forceRefresh = false) => {
+        const { getStudentId, clearSessionCache } = await import('@/services/supabase');
+
+        if (forceRefresh) {
+            clearSessionCache();
+        }
+
+        const id = await getStudentId();
+        console.log('ExploreScreen: Current Student ID is:', id);
+        setCurrentStudentId(id);
+    };
+
+    useEffect(() => {
+        loadUserId();
+    }, []);
+
+    const loadEvents = useCallback(async () => {
+        try {
+            const data = await eventsApi.getEvents();
+            setEvents(data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
+
+    const loadSpots = useCallback(async () => {
+        try {
+            const data = await spotsApi.getSpots();
+            setSpots(data);
+        } catch (err) {
+            console.error('Error loading spots:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadEvents();
+        loadSpots();
+    }, [loadEvents, loadSpots]);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        // Force fully fresh user ID
+        await loadUserId(true);
+        loadEvents();
+        loadSpots();
+    };
+
+    const handleDeleteEvent = async (eventId: number) => {
+        Alert.alert(
+            "Delete Vibe?",
+            "Are you sure you want to remove this vibe?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        console.log('Deleting event:', eventId);
+                        const success = await eventsApi.deleteEvent(eventId);
+                        if (success) {
+                            setEvents(prev => prev.filter(e => e.Id !== eventId));
+                        } else {
+                            Alert.alert('Error', 'Could not delete vibe. Please try again.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        let hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const time = `${hours}:${minutes < 10 ? '0' + minutes : minutes} ${ampm}`;
+
         return {
             day: days[date.getDay()],
             date: date.getDate(),
             month: months[date.getMonth()],
+            time
         };
     };
 
@@ -84,31 +142,51 @@ export default function ExploreScreen() {
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => Alert.alert('Filter', 'Filter options coming soon!')}
+                    >
                         <Ionicons name="options-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerTitle}>Explore</Text>
                     </View>
-                    <TouchableOpacity style={styles.headerIcon}>
-                        <Ionicons name="person-outline" size={22} color={Colors.white} />
-                        <View style={styles.notificationDot} />
+                    <TouchableOpacity style={styles.createButton} onPress={() => setShowEventModal(true)}>
+                        <LinearGradient
+                            colors={['#7C3AED', '#6D28D9']}
+                            style={styles.createButtonGradient}
+                        >
+                            <Ionicons name="add" size={24} color={Colors.white} />
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.content}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary.main} />
+                    }
+                >
                     {/* Trending Spots Section */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Trending Spots</Text>
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.spotsContainer}
+                            contentContainerStyle={styles.spotsScroll}
                         >
-                            {trendingSpots.map((spot) => (
-                                <TouchableOpacity key={spot.id} style={styles.spotCard}>
+                            {spots.map((spot) => (
+                                <TouchableOpacity
+                                    key={spot.id}
+                                    style={styles.spotCard}
+                                    onPress={() => {
+                                        setSelectedSpot(spot);
+                                        setShowSpotModal(true);
+                                    }}
+                                >
                                     <Image
-                                        source={{ uri: spot.image }}
+                                        source={{ uri: spot.imageUrl }}
                                         style={styles.spotImage}
                                         resizeMode="cover"
                                     />
@@ -118,9 +196,17 @@ export default function ExploreScreen() {
                                     />
                                     <View style={styles.spotInfo}>
                                         <Text style={styles.spotName}>{spot.name}</Text>
-                                        <Text style={styles.spotStudents}>
-                                            • {spot.studentCount} students here
-                                        </Text>
+                                        <View style={styles.spotStudentsRow}>
+                                            <Ionicons name="people" size={14} color="#7C3AED" />
+                                            <Text style={styles.spotStudents}>
+                                                {spot.studentCount} {spot.studentCount === 1 ? 'student' : 'students'}
+                                            </Text>
+                                            {spot.isCheckedIn && (
+                                                <View style={styles.checkedInBadge}>
+                                                    <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
                                 </TouchableOpacity>
                             ))}
@@ -129,32 +215,93 @@ export default function ExploreScreen() {
 
                     {/* Campus Events Section */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Campus Events</Text>
-                        {campusEvents.map((event) => {
-                            const dateInfo = formatDate(event.date);
-                            return (
-                                <TouchableOpacity key={event.id} style={styles.eventCard}>
-                                    <View style={styles.eventDateBadge}>
-                                        <Text style={styles.eventDay}>{dateInfo.day}</Text>
-                                        <Text style={styles.eventDate}>{dateInfo.date}</Text>
-                                        <Text style={styles.eventMonth}>{dateInfo.month}</Text>
-                                    </View>
-                                    <Image
-                                        source={{ uri: event.image }}
-                                        style={styles.eventImage}
-                                        resizeMode="cover"
-                                    />
-                                    <View style={styles.eventInfo}>
-                                        <Text style={styles.eventName}>{event.name}</Text>
-                                        <Text style={styles.eventLocation}>
-                                            {event.location} • {event.time}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            );
-                        })}
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Campus Vibes</Text>
+                            <TouchableOpacity onPress={() => setShowEventModal(true)}>
+                                <Text style={styles.seeAll}>+ Add Vibe</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {isLoading && events.length === 0 ? (
+                            <ActivityIndicator color={Colors.primary.main} style={{ marginTop: 20 }} />
+                        ) : events.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="planet-outline" size={48} color="rgba(255,255,255,0.3)" />
+                                <Text style={styles.emptyText}>No vibes yet. Start one!</Text>
+                            </View>
+                        ) : (
+                            events.map((event) => {
+                                const dateInfo = formatDate(event.StartTime);
+                                const isCreator = currentStudentId === event.CreatorId;
+
+                                // Debug logging
+                                if (!isCreator && currentStudentId === 1000) {
+                                    // console.log('You are guest (1000), Event Creator:', event.CreatorId);
+                                }
+
+                                return (
+                                    <TouchableOpacity
+                                        key={event.Id}
+                                        style={styles.eventCard}
+                                        onPress={() => Alert.alert(
+                                            event.Title,
+                                            `📍 ${event.Location}\n🕐 ${dateInfo.time}\n👤 by ${event.Creator?.Name || 'Student'}`,
+                                            [{ text: 'OK' }]
+                                        )}
+                                    >
+                                        <View style={styles.eventDateBadge}>
+                                            <Text style={styles.eventDay}>{dateInfo.day}</Text>
+                                            <Text style={styles.eventDate}>{dateInfo.date}</Text>
+                                            <Text style={styles.eventMonth}>{dateInfo.month}</Text>
+                                        </View>
+
+                                        {/* Creator Image or Default */}
+                                        <Image
+                                            source={{ uri: event.Creator?.PhotoUrl || 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=400' }}
+                                            style={styles.eventImage}
+                                            resizeMode="cover"
+                                        />
+
+                                        <View style={styles.eventInfo}>
+                                            <Text style={styles.eventName}>{event.Title}</Text>
+                                            <Text style={styles.eventLocation}>
+                                                📍 {event.Location} • {dateInfo.time}
+                                            </Text>
+                                            <Text style={styles.creatorName}>
+                                                by {event.Creator?.Name || 'Student'}
+                                            </Text>
+                                        </View>
+
+                                        {/* Delete button - only if creator */}
+                                        {isCreator && (
+                                            <TouchableOpacity
+                                                style={styles.deleteButton}
+                                                onPress={() => handleDeleteEvent(event.Id)}
+                                            >
+                                                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                                            </TouchableOpacity>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
                     </View>
                 </ScrollView>
+
+                <EventModal
+                    visible={showEventModal}
+                    onClose={() => setShowEventModal(false)}
+                    onEventCreated={loadEvents}
+                />
+
+                <SpotDetailModal
+                    visible={showSpotModal}
+                    spot={selectedSpot}
+                    onClose={() => setShowSpotModal(false)}
+                    onCheckInChange={() => {
+                        loadSpots();
+                    }}
+                />
             </SafeAreaView>
         </LinearGradient>
     );
@@ -193,27 +340,38 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: Colors.white,
     },
-    notificationDot: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#EF4444',
+    createButton: {
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    createButtonGradient: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     content: {
         paddingBottom: 100,
     },
     section: {
-        marginTop: 20,
+        marginTop: 24,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        marginBottom: 16,
     },
     sectionTitle: {
         fontSize: 20,
         fontWeight: '700',
         color: Colors.white,
-        paddingHorizontal: 16,
-        marginBottom: 16,
+    },
+    seeAll: {
+        fontSize: 14,
+        color: '#7C3AED',
+        fontWeight: '600',
     },
     spotsContainer: {
         paddingHorizontal: 16,
@@ -264,6 +422,8 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         padding: 12,
         gap: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
     },
     eventDateBadge: {
         width: 50,
@@ -288,15 +448,17 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.5)',
     },
     eventImage: {
-        width: 60,
-        height: 60,
-        borderRadius: 12,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        borderWidth: 2,
+        borderColor: '#7C3AED',
     },
     eventInfo: {
         flex: 1,
     },
     eventName: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: '600',
         color: Colors.white,
         marginBottom: 4,
@@ -304,5 +466,34 @@ const styles = StyleSheet.create({
     eventLocation: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.6)',
+        marginBottom: 2,
+    },
+    creatorName: {
+        fontSize: 11,
+        color: '#7C3AED',
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 40,
+        opacity: 0.7,
+    },
+    emptyText: {
+        color: 'rgba(255,255,255,0.5)',
+        marginTop: 12,
+    },
+    deleteButton: {
+        padding: 8,
+    },
+    spotsScroll: {
+        paddingRight: 16,
+    },
+    spotStudentsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    checkedInBadge: {
+        marginLeft: 4,
     },
 });

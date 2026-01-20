@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     SafeAreaView,
     Dimensions,
+    Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -59,7 +60,8 @@ export default function LikesScreen() {
                 style={styles.likeCard}
                 onPress={() => {
                     if (!showBlur) {
-                        // Navigate to profile or match
+                        // Navigate to profile
+                        router.push(`/profile/${like.id}`);
                     }
                 }}
                 activeOpacity={showBlur ? 1 : 0.8}
@@ -92,7 +94,17 @@ export default function LikesScreen() {
 
                 {showBlur && (
                     <View style={styles.blurOverlay}>
-                        <TouchableOpacity style={styles.upgradeButton}>
+                        <TouchableOpacity
+                            style={styles.upgradeButton}
+                            onPress={() => {
+                                // TODO: Show premium subscription modal
+                                Alert.alert(
+                                    'Premium Feature',
+                                    'Upgrade to Premium to see everyone who liked you!',
+                                    [{ text: 'OK' }]
+                                );
+                            }}
+                        >
                             <Text style={styles.upgradeText}>Upgrade to see</Text>
                         </TouchableOpacity>
                     </View>
@@ -124,13 +136,19 @@ export default function LikesScreen() {
             <SafeAreaView style={styles.safeArea}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => Alert.alert('Filter', 'Filter options coming soon!')}
+                    >
                         <Ionicons name="options-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerTitle}>Activity/Likes You</Text>
                     </View>
-                    <TouchableOpacity style={styles.headerIcon}>
+                    <TouchableOpacity
+                        style={styles.headerIcon}
+                        onPress={() => router.push('/profile')}
+                    >
                         <Ionicons name="person-outline" size={22} color={Colors.white} />
                     </TouchableOpacity>
                 </View>
@@ -146,7 +164,20 @@ export default function LikesScreen() {
 
                     {/* Premium CTA */}
                     {!isPremium && (
-                        <TouchableOpacity style={styles.premiumCta}>
+                        <TouchableOpacity
+                            style={styles.premiumCta}
+                            onPress={() => {
+                                // TODO: Navigate to premium subscription page
+                                Alert.alert(
+                                    'CampusMatch Premium',
+                                    'Unlock unlimited likes, see who liked you, and more!\n\nPricing:\n• $9.99/month\n• $24.99/3 months\n• $49.99/year',
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        { text: 'Subscribe', onPress: () => { } }
+                                    ]
+                                );
+                            }}
+                        >
                             <LinearGradient
                                 colors={['#7C3AED', '#6D28D9']}
                                 style={styles.premiumGradient}

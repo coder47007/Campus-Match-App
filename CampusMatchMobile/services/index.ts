@@ -14,4 +14,7 @@ export { promptsApi } from './prompts';
 export { likesApi } from './likes';
 export { reportsApi } from './reports';
 export { eventsApi } from './events';
+export { spotsApi } from './spots';
+export { subscriptionsApi } from './subscriptions';
+export { notificationService } from './notifications';
 

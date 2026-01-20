@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    TextInput,
+    TextInput as RNTextInput,
     TouchableOpacity,
     StyleSheet,
     KeyboardAvoidingView,
@@ -12,10 +12,11 @@ import {
     Alert,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/authStore';
 import Colors from '@/constants/Colors';
+import Button from '@/components/ui/Button';
+import TextInput from '@/components/ui/TextInput';
 
 export default function RegisterScreen() {
     const router = useRouter();
@@ -83,10 +84,7 @@ export default function RegisterScreen() {
     };
 
     return (
-        <LinearGradient
-            colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
-            style={styles.container}
-        >
+        <View style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
@@ -118,109 +116,71 @@ export default function RegisterScreen() {
                             </View>
                         )}
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="person-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Full Name"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={name}
-                                onChangeText={setName}
-                                autoComplete="name"
-                            />
-                        </View>
+                        <TextInput
+                            label="Full Name"
+                            leftIcon="person-outline"
+                            placeholder="Full Name"
+                            value={name}
+                            onChangeText={setName}
+                            autoComplete="name"
+                        />
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="mail-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Email"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                            />
-                        </View>
+                        <TextInput
+                            label="Email"
+                            leftIcon="mail-outline"
+                            placeholder="Email"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoComplete="email"
+                        />
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="call-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Phone Number"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={phoneNumber}
-                                onChangeText={setPhoneNumber}
-                                keyboardType="phone-pad"
-                                autoComplete="tel"
-                            />
-                        </View>
+                        <TextInput
+                            label="Phone Number"
+                            leftIcon="call-outline"
+                            placeholder="Phone Number"
+                            value={phoneNumber}
+                            onChangeText={setPhoneNumber}
+                            keyboardType="phone-pad"
+                            autoComplete="tel"
+                        />
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="logo-instagram" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Instagram Handle (optional)"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={instagramHandle}
-                                onChangeText={setInstagramHandle}
-                                autoCapitalize="none"
-                            />
-                        </View>
+                        <TextInput
+                            label="Instagram Handle (optional)"
+                            leftIcon="logo-instagram"
+                            placeholder="Instagram Handle"
+                            value={instagramHandle}
+                            onChangeText={setInstagramHandle}
+                            autoCapitalize="none"
+                        />
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                            />
-                            <TouchableOpacity
-                                onPress={() => setShowPassword(!showPassword)}
-                                style={styles.showPasswordButton}
-                            >
-                                <Ionicons
-                                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                    size={20}
-                                    color={Colors.dark.textMuted}
-                                />
-                            </TouchableOpacity>
-                        </View>
+                        <TextInput
+                            label="Password"
+                            isPassword
+                            placeholder="Password"
+                            value={password}
+                            onChangeText={setPassword}
+                        />
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Confirm Password"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                secureTextEntry={!showPassword}
-                            />
-                        </View>
+                        <TextInput
+                            label="Confirm Password"
+                            isPassword
+                            placeholder="Confirm Password"
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                        />
 
-                        <TouchableOpacity
-                            style={styles.registerButton}
+                        <Button
+                            variant="primary"
+                            size="large"
                             onPress={handleRegister}
-                            disabled={isLoading}
+                            loading={isLoading}
+                            fullWidth
+                            accessibilityLabel="Create your account"
                         >
-                            <LinearGradient
-                                colors={Colors.primary.gradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.registerButtonGradient}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator color={Colors.white} />
-                                ) : (
-                                    <Text style={styles.registerButtonText}>Create Account</Text>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
+                            Create Account
+                        </Button>
 
                         <View style={styles.loginLink}>
                             <Text style={styles.loginText}>Already have an account? </Text>
@@ -233,7 +193,7 @@ export default function RegisterScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
-        </LinearGradient>
+        </View>
     );
 }
 

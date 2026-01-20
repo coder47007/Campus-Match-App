@@ -164,7 +164,12 @@ public class Match
     public int Student1Id { get; set; }
     public int Student2Id { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;  // For unmatch functionality
+    
+    // Soft delete
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
     
     // Navigation properties
     public Student Student1 { get; set; } = null!;
@@ -187,6 +192,10 @@ public class Message
     public DateTime? DeliveredAt { get; set; }
     public DateTime? ReadAt { get; set; }
     public bool IsRead { get; set; } = false;
+    
+    // Soft delete (for message deletion)
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
     
     // Navigation properties
     public Match Match { get; set; } = null!;

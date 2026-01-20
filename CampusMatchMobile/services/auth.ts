@@ -1,5 +1,5 @@
 // Authentication API service using Supabase Auth directly
-import { supabase } from './supabase';
+import { supabase, clearSessionCache } from './supabase';
 import { setStorageItem, deleteStorageItem } from '../utils/storage';
 import { STORAGE_KEYS } from '../constants/config';
 import {
@@ -137,13 +137,12 @@ export const authApi = {
 
     // Logout from Supabase
     logout: async (): Promise<void> => {
-        try {
-            await supabase.auth.signOut();
-        } catch (error) {
-            console.error('Logout error:', error);
-        } finally {
-            await deleteStorageItem(STORAGE_KEYS.AUTH_TOKEN);
-            await deleteStorageItem(STORAGE_KEYS.REFRESH_TOKEN);
+        const { error } = await supabase.auth.signOut();
+        clearSessionCache(); // Clear cached ID
+        await deleteStorageItem(STORAGE_KEYS.AUTH_TOKEN);
+        await deleteStorageItem(STORAGE_KEYS.REFRESH_TOKEN);
+        if (error) {
+            throw new Error(error.message);
         }
     },
 
@@ -204,12 +203,21 @@ export const authApi = {
 
     // Delete account
     deleteAccount: async (): Promise<void> => {
-        const { data: { user } } = await supabase.auth.getUser();
+        // PHASE 3: Use REST API instead of direct database access
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
 
-        if (user) {
-            await supabase.from('Students').delete().eq('Id', user.id);
+            if (user) {
+                // Call backend API to delete account (includes business logic & validation)
+                const api = (await import('./api')).default;
+                await api.delete('/profiles/me');
+            }
+        } catch (error) {
+            console.error('Error deleting account via API:', error);
+            // Fallback: still sign out even if API call fails
         }
 
+        // Sign out from Supabase auth
         await supabase.auth.signOut();
         await deleteStorageItem(STORAGE_KEYS.AUTH_TOKEN);
         await deleteStorageItem(STORAGE_KEYS.REFRESH_TOKEN);

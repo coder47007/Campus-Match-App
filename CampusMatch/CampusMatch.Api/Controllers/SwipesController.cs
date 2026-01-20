@@ -2,11 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using CampusMatch.Api.Data;
 using CampusMatch.Api.Hubs;
 using CampusMatch.Api.Models;
+using CampusMatch.Api.Repositories;
 using CampusMatch.Shared.DTOs;
 
 namespace CampusMatch.Api.Controllers;
@@ -16,12 +15,12 @@ namespace CampusMatch.Api.Controllers;
 [Authorize]
 public class SwipesController : ControllerBase
 {
-    private readonly CampusMatchDbContext _db;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<ChatHub> _hubContext;
     
-    public SwipesController(CampusMatchDbContext db, IHubContext<ChatHub> hubContext)
+    public SwipesController(IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext)
     {
-        _db = db;
+        _unitOfWork = unitOfWork;
         _hubContext = hubContext;
     }
     
@@ -34,7 +33,7 @@ public class SwipesController : ControllerBase
         var userId = GetUserId();
         
         // Check if blocked
-        var isBlocked = await _db.Blocks.AnyAsync(b =>
+        var isBlocked = await _unitOfWork.Blocks.AnyAsync(b =>
             (b.BlockerId == userId && b.BlockedId == request.SwipedId) ||
             (b.BlockerId == request.SwipedId && b.BlockedId == userId));
             
@@ -42,8 +41,7 @@ public class SwipesController : ControllerBase
             return BadRequest("Cannot swipe on this profile.");
         
         // Check if already swiped
-        var existingSwipe = await _db.Swipes
-            .FirstOrDefaultAsync(s => s.SwiperId == userId && s.SwipedId == request.SwipedId);
+        var existingSwipe = await _unitOfWork.Swipes.GetSwipeAsync(userId, request.SwipedId);
             
         if (existingSwipe != null)
         {
@@ -53,7 +51,7 @@ public class SwipesController : ControllerBase
         // Handle super like limit
         if (request.IsSuperLike)
         {
-            var user = await _db.Students.FindAsync(userId);
+            var user = await _unitOfWork.Students.GetByIdAsync(userId);
             if (user == null) return NotFound();
             
             // Reset if needed
@@ -80,16 +78,15 @@ public class SwipesController : ControllerBase
             IsSuperLike = request.IsSuperLike
         };
         
-        _db.Swipes.Add(swipe);
-        await _db.SaveChangesAsync();
+        await _unitOfWork.Swipes.AddAsync(swipe);
+        await _unitOfWork.SaveChangesAsync();
         
         // If like, check for mutual match
         if (request.IsLike)
         {
-            var mutualLike = await _db.Swipes
-                .FirstOrDefaultAsync(s => s.SwiperId == request.SwipedId && s.SwipedId == userId && s.IsLike);
+            var mutualLike = await _unitOfWork.Swipes.GetSwipeAsync(request.SwipedId, userId);
                 
-            if (mutualLike != null)
+            if (mutualLike != null && mutualLike.IsLike)
             {
                 // Create match
                 var match = new Match
@@ -98,12 +95,12 @@ public class SwipesController : ControllerBase
                     Student2Id = Math.Max(userId, request.SwipedId)
                 };
                 
-                _db.Matches.Add(match);
-                await _db.SaveChangesAsync();
+                await _unitOfWork.Matches.AddAsync(match);
+                await _unitOfWork.SaveChangesAsync();
                 
                 // Get both students for notifications
-                var currentUser = await _db.Students.FindAsync(userId);
-                var otherUser = await _db.Students.FindAsync(request.SwipedId);
+                var currentUser = await _unitOfWork.Students.GetByIdAsync(userId);
+                var otherUser = await _unitOfWork.Students.GetByIdAsync(request.SwipedId);
                 
                 var matchDtoForCurrent = new MatchDto(
                     match.Id, otherUser!.Id, otherUser.Name, otherUser.PhotoUrl, otherUser.Major, match.CreatedAt
@@ -132,7 +129,7 @@ public class SwipesController : ControllerBase
     public async Task<ActionResult<UndoSwipeResponse>> UndoLastSwipe()
     {
         var userId = GetUserId();
-        var user = await _db.Students.FindAsync(userId);
+        var user = await _unitOfWork.Students.GetByIdAsync(userId);
         if (user == null) return NotFound();
         
         // Reset rewinds if needed
@@ -150,10 +147,7 @@ public class SwipesController : ControllerBase
         
         // Find the most recent swipe (within 30 seconds)
         var recentCutoff = DateTime.UtcNow.AddSeconds(-30);
-        var lastSwipe = await _db.Swipes
-            .Where(s => s.SwiperId == userId && s.CreatedAt >= recentCutoff)
-            .OrderByDescending(s => s.CreatedAt)
-            .FirstOrDefaultAsync();
+        var lastSwipe = await _unitOfWork.Swipes.GetRecentSwipeAsync(userId, recentCutoff);
         
         if (lastSwipe == null)
         {
@@ -161,23 +155,20 @@ public class SwipesController : ControllerBase
         }
         
         // Check if a match was created from this swipe
-        var match = await _db.Matches
-            .FirstOrDefaultAsync(m => 
-                (m.Student1Id == userId && m.Student2Id == lastSwipe.SwipedId) ||
-                (m.Student1Id == lastSwipe.SwipedId && m.Student2Id == userId));
+        var match = await _unitOfWork.Matches.GetMatchBetweenAsync(userId, lastSwipe.SwipedId);
         
         if (match != null)
         {
             // Delete messages first
-            var messages = await _db.Messages.Where(m => m.MatchId == match.Id).ToListAsync();
-            _db.Messages.RemoveRange(messages);
+            var messages = await _unitOfWork.Messages.GetMessagesForMatchAsync(match.Id, 0, int.MaxValue);
+            _unitOfWork.Messages.RemoveRange(messages);
             
             // Delete match
-            _db.Matches.Remove(match);
+            _unitOfWork.Matches.Remove(match);
         }
         
         // Delete the swipe
-        _db.Swipes.Remove(lastSwipe);
+        _unitOfWork.Swipes.Remove(lastSwipe);
         
         // Refund super like if applicable
         if (lastSwipe.IsSuperLike)
@@ -188,7 +179,7 @@ public class SwipesController : ControllerBase
         // Use rewind
         user.RewindsRemaining--;
         
-        await _db.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         
         return Ok(new UndoSwipeResponse(true, "Swipe undone successfully."));
     }
@@ -198,7 +189,7 @@ public class SwipesController : ControllerBase
     public async Task<ActionResult<object>> GetRewindsRemaining()
     {
         var userId = GetUserId();
-        var user = await _db.Students.FindAsync(userId);
+        var user = await _unitOfWork.Students.GetByIdAsync(userId);
         if (user == null) return NotFound();
         
         // Reset if needed
@@ -206,7 +197,7 @@ public class SwipesController : ControllerBase
         {
             user.RewindsRemaining = 1;
             user.RewindsResetAt = DateTime.UtcNow.Date.AddDays(1);
-            await _db.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
         }
         
         return Ok(new { 

@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.FileProviders;
+using Hangfire;
+using Hangfire.MemoryStorage;
 using CampusMatch.Api.Data;
 using CampusMatch.Api.Hubs;
 using CampusMatch.Api.Services;
@@ -16,7 +18,45 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<CampusMatchDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// JWT Authentication
+// Repository Pattern - Phase 1.1
+builder.Services.AddScoped<CampusMatch.Api.Repositories.IUnitOfWork, CampusMatch.Api.Repositories.UnitOfWork>();
+builder.Services.AddScoped<CampusMatch.Api.Repositories.IStudentRepository, CampusMatch.Api.Repositories.StudentRepository>();
+builder.Services.AddScoped<CampusMatch.Api.Repositories.ISwipeRepository, CampusMatch.Api.Repositories.SwipeRepository>();
+builder.Services.AddScoped<CampusMatch.Api.Repositories.IMatchRepository, CampusMatch.Api.Repositories.MatchRepository>();
+builder.Services.AddScoped<CampusMatch.Api.Repositories.IMessageRepository, CampusMatch.Api.Repositories.MessageRepository>();
+
+// Caching Layer - Phase 1.2
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrEmpty(redisConnection))
+{
+    // Use Redis for distributed caching in production
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+        options.InstanceName = "CampusMatch:";
+    });
+    builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+}
+else
+{
+    // Fallback to in-memory cache for development
+    builder.Services.AddMemoryCache();
+    builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
+}
+
+// Background Jobs - Phase 1.3
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseMemoryStorage()); // Use Redis in production: UseRedisStorage(redisConnection)
+
+builder.Services.AddHangfireServer();
+builder.Services.AddSingleton<CampusMatch.Api.Services.BackgroundJobs.IBackgroundJobService, CampusMatch.Api.Services.BackgroundJobs.HangfireBackgroundJobService>();
+builder.Services.AddScoped<CampusMatch.Api.Services.BackgroundJobs.MatchJobService>();
+builder.Services.AddScoped<CampusMatch.Api.Services.BackgroundJobs.UserJobService>();
+
+// JWT Authentication - PRODUCTION READY
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -46,6 +86,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
         };
     });
+
 
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
@@ -104,6 +145,23 @@ builder.Services.AddHttpClient<IPushNotificationService, PushNotificationService
 builder.Services.AddControllers();
 builder.Services.AddSignalR();
 
+// API Versioning - Phase 1.5
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new Asp.Versioning.ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = Asp.Versioning.ApiVersionReader.Combine(
+        new Asp.Versioning.UrlSegmentApiVersionReader(),
+        new Asp.Versioning.HeaderApiVersionReader("X-Api-Version")
+    );
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 // CORS
 builder.Services.AddCors(options =>
 {
@@ -117,7 +175,15 @@ builder.Services.AddCors(options =>
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo 
+    { 
+        Title = "CampusMatch API", 
+        Version = "v1",
+        Description = "Campus dating app API - connecting students across universities"
+    });
+});
 
 var app = builder.Build();
 

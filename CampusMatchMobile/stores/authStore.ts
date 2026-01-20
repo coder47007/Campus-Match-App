@@ -47,8 +47,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 isLoading: false,
             });
 
-            // Start SignalR connection
-            signalRService.start();
+            // Temporarily disabled SignalR - using Supabase for real-time
+            // signalRService.start();
         } catch (error: unknown) {
             const errorMessage = error instanceof Error
                 ? error.message
@@ -73,8 +73,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 isLoading: false,
             });
 
-            // Start SignalR connection
-            signalRService.start();
+            // Temporarily disabled SignalR - using Supabase for real-time
+            // signalRService.start();
         } catch (error: unknown) {
             const errorMessage = error instanceof Error
                 ? error.message
@@ -137,8 +137,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
                 set({ token, user, isInitialized: true });
 
-                // Start SignalR connection
-                signalRService.start();
+                // Temporarily disabled SignalR
+                // signalRService.start();
 
                 return true;
             }

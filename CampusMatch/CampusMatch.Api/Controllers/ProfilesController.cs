@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using CampusMatch.Api.Data;
 using CampusMatch.Api.Models;
+using CampusMatch.Api.Services;
 using CampusMatch.Shared.DTOs;
 
 namespace CampusMatch.Api.Controllers;
@@ -14,10 +15,12 @@ namespace CampusMatch.Api.Controllers;
 public class ProfilesController : ControllerBase
 {
     private readonly CampusMatchDbContext _db;
+    private readonly ICacheService _cache;
     
-    public ProfilesController(CampusMatchDbContext db)
+    public ProfilesController(CampusMatchDbContext db, ICacheService cache)
     {
         _db = db;
+        _cache = cache;
     }
     
     private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -26,6 +29,15 @@ public class ProfilesController : ControllerBase
     public async Task<ActionResult<StudentDto>> GetMyProfile()
     {
         var userId = GetUserId();
+        var cacheKey = CacheKeys.StudentProfile(userId);
+        
+        // Try cache first
+        var cachedProfile = await _cache.GetAsync<StudentDto>(cacheKey);
+        if (cachedProfile != null)
+        {
+            return Ok(cachedProfile);
+        }
+        
         var student = await _db.Students
             .Include(s => s.Interests)
                 .ThenInclude(si => si.Interest)
@@ -35,19 +47,24 @@ public class ProfilesController : ControllerBase
             .FirstOrDefaultAsync(s => s.Id == userId);
             
         if (student == null) return NotFound();
-        return Ok(MapToDto(student));
+        
+        var dto = MapToDto(student);
+        await _cache.SetAsync(cacheKey, dto, CacheKeys.Expiration.Medium);
+        
+        return Ok(dto);
     }
     
     [HttpPut("me")]
     public async Task<ActionResult<StudentDto>> UpdateMyProfile(ProfileUpdateRequest request)
     {
+        var userId = GetUserId();
         var student = await _db.Students
             .Include(s => s.Interests)
                 .ThenInclude(si => si.Interest)
             .Include(s => s.Photos)
             .Include(s => s.Prompts)
                 .ThenInclude(sp => sp.Prompt)
-            .FirstOrDefaultAsync(s => s.Id == GetUserId());
+            .FirstOrDefaultAsync(s => s.Id == userId);
         if (student == null) return NotFound();
         
         student.Name = request.Name;
@@ -66,7 +83,40 @@ public class ProfilesController : ControllerBase
         student.LastActiveAt = DateTime.UtcNow;
         
         await _db.SaveChangesAsync();
-        return Ok(MapToDto(student));
+        
+        // Invalidate cache after update
+        await _cache.RemoveAsync(CacheKeys.StudentProfile(userId));
+        await _cache.RemoveAsync(CacheKeys.Student(userId));
+        
+        var dto = MapToDto(student);
+        return Ok(dto);
+    }
+    
+    // PHASE 3: Added to replace direct database access from client
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteMyAccount()
+    {
+        var userId = GetUserId();
+        var student = await _db.Students
+            .Include(s => s.Photos)
+            .Include(s => s.Prompts)
+            .Include(s => s.Interests)
+            .FirstOrDefaultAsync(s => s.Id == userId);
+            
+        if (student == null) return NotFound();
+        
+        // Business logic: Delete related data (cascade will handle most, but explicit for clarity)
+        // Note: Matches, Swipes, Messages will be cascade deleted by database constraints
+        
+        _db.Students.Remove(student);
+        await _db.SaveChangesAsync();
+        
+        // Invalidate all cached data for this user
+        await _cache.RemoveAsync(CacheKeys.StudentProfile(userId));
+        await _cache.RemoveAsync(CacheKeys.Student(userId));
+        await _cache.RemoveAsync(CacheKeys.StudentMatches(userId));
+        
+        return NoContent();
     }
     
     [HttpGet("discover")]
@@ -79,44 +129,42 @@ public class ProfilesController : ControllerBase
         [FromQuery] string? majors = null)  // comma-separated
     {
         var userId = GetUserId();
-        var currentUser = await _db.Students
-            .Include(s => s.Interests)
-            .FirstOrDefaultAsync(s => s.Id == userId);
+        
+        // OPTIMIZED: Get current user with only needed fields
+        var currentUserData = await _db.Students
+            .Where(s => s.Id == userId)
+            .Select(s => new {
+                s.MinAgePreference,
+                s.MaxAgePreference,
+                s.PreferredGender,
+                s.University,
+                InterestIds = s.Interests.Select(i => i.InterestId).ToList()
+            })
+            .FirstOrDefaultAsync();
             
-        if (currentUser == null) return NotFound();
+        if (currentUserData == null) return NotFound();
         
-        var myInterestIds = currentUser.Interests?.Select(i => i.InterestId).ToHashSet() ?? new();
+        var myInterestIds = currentUserData.InterestIds.ToHashSet();
         
-        // Get IDs of students already swiped on
-        var swipedIds = await _db.Swipes
+        // OPTIMIZED: Single query to get all excluded IDs (swipes + blocks)
+        var excludedIds = await _db.Swipes
             .Where(s => s.SwiperId == userId)
             .Select(s => s.SwipedId)
+            .Union(_db.Blocks
+                .Where(b => b.BlockerId == userId || b.BlockedId == userId)
+                .Select(b => b.BlockerId == userId ? b.BlockedId : b.BlockerId))
             .ToListAsync();
         
-        // Get IDs of blocked users (both directions)
-        var blockedIds = await _db.Blocks
-            .Where(b => b.BlockerId == userId || b.BlockedId == userId)
-            .Select(b => b.BlockerId == userId ? b.BlockedId : b.BlockerId)
-            .ToListAsync();
+        var excludedIdsSet = excludedIds.ToHashSet();
         
-        // Combine excluded IDs
-        var excludedIds = swipedIds.Concat(blockedIds).Distinct().ToHashSet();
-        
-        // Get candidates with interests - apply preference filters
+        // OPTIMIZED: Build WHERE clause in database, not C#
         var candidatesQuery = _db.Students
-            .Include(s => s.Interests)
-                .ThenInclude(si => si.Interest)
-            .Include(s => s.Prompts)
-                .ThenInclude(sp => sp.Prompt)
-            .Include(s => s.Photos.OrderBy(p => p.DisplayOrder))
-            .Where(s => s.Id != userId && !excludedIds.Contains(s.Id) && !s.IsAdmin);
-        
-        // Filter out hidden profiles and banned users
-        candidatesQuery = candidatesQuery.Where(s => !s.IsProfileHidden && !s.IsBanned);
+            .Where(s => s.Id != userId && !excludedIdsSet.Contains(s.Id) && !s.IsAdmin)
+            .Where(s => !s.IsProfileHidden && !s.IsBanned);
         
         // Apply age filter (use provided params or user preferences)
-        var filterMinAge = minAge ?? currentUser.MinAgePreference;
-        var filterMaxAge = maxAge ?? currentUser.MaxAgePreference;
+        var filterMinAge = minAge ?? currentUserData.MinAgePreference;
+        var filterMaxAge = maxAge ?? currentUserData.MaxAgePreference;
         
         if (filterMinAge > 0 || filterMaxAge > 0)
         {
@@ -127,7 +175,7 @@ public class ProfilesController : ControllerBase
         }
         
         // Apply gender preference filter (use provided param or user preference)
-        var filterGender = gender ?? currentUser.PreferredGender;
+        var filterGender = gender ?? currentUserData.PreferredGender;
         if (!string.IsNullOrEmpty(filterGender) && filterGender != "Everyone" && filterGender != "everyone")
         {
             // Normalize gender values
@@ -155,7 +203,7 @@ public class ProfilesController : ControllerBase
             }
         }
         
-        // Apply major filter (simplified - checks if major contains any of the filter values)
+        // Apply major filter
         if (!string.IsNullOrEmpty(majors))
         {
             var majorsList = majors.Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -171,29 +219,88 @@ public class ProfilesController : ControllerBase
             }
         }
         
-        var candidates = await candidatesQuery.ToListAsync();
+        // OPTIMIZED: Use projection to fetch only needed data in single query
+        var candidates = await candidatesQuery
+            .Select(s => new {
+                s.Id,
+                s.Email,
+                s.Name,
+                s.Age,
+                s.Major,
+                s.Year,
+                s.Bio,
+                s.PhotoUrl,
+                s.University,
+                s.Gender,
+                s.PreferredGender,
+                s.PhoneNumber,
+                s.InstagramHandle,
+                s.Latitude,
+                s.Longitude,
+                s.LastActiveAt,
+                InterestIds = s.Interests.Select(i => i.InterestId).ToList(),
+                Interests = s.Interests.Select(si => new { 
+                    si.Interest.Id, 
+                    si.Interest.Name, 
+                    si.Interest.Emoji, 
+                    si.Interest.Category 
+                }).ToList(),
+                Photos = s.Photos.OrderBy(p => p.DisplayOrder).Select(p => new {
+                    p.Id,
+                    p.Url,
+                    p.IsPrimary,
+                    p.DisplayOrder
+                }).ToList(),
+                Prompts = s.Prompts.OrderBy(sp => sp.DisplayOrder).Select(sp => new {
+                    sp.Id,
+                    sp.PromptId,
+                    sp.Prompt.Question,
+                    sp.Answer,
+                    sp.DisplayOrder
+                }).ToList()
+            })
+            .ToListAsync();
         
-        // Score and rank candidates
+        // Score and rank candidates (done in C# after fetching minimal data)
         var scored = candidates.Select(c =>
         {
-            var theirInterestIds = c.Interests?.Select(i => i.InterestId).ToHashSet() ?? new();
+            var theirInterestIds = c.InterestIds.ToHashSet();
             var sharedInterests = myInterestIds.Intersect(theirInterestIds).Count();
             
             int score = 0;
             score += sharedInterests * 10;  // 10 points per shared interest
-            score += c.University == currentUser.University ? 20 : 0;  // Same university bonus
+            score += c.University == currentUserData.University ? 20 : 0;  // Same university bonus
             score += c.LastActiveAt > DateTime.UtcNow.AddDays(-1) ? 15 : 0;  // Recently active bonus
             score += c.LastActiveAt > DateTime.UtcNow.AddDays(-7) ? 5 : 0;  // Active in week bonus
             
-            return (Student: c, Score: score);
+            return (Candidate: c, Score: score);
         })
         .OrderByDescending(x => x.Score)
         .ThenBy(_ => Guid.NewGuid())  // Randomize within same score
         .Take(20)
-        .Select(x => x.Student)
+        .Select(x => new StudentDto(
+            x.Candidate.Id,
+            x.Candidate.Email,
+            x.Candidate.Name,
+            x.Candidate.Age,
+            x.Candidate.Major,
+            x.Candidate.Year,
+            x.Candidate.Bio,
+            x.Candidate.PhotoUrl,
+            x.Candidate.University,
+            x.Candidate.Gender,
+            x.Candidate.PreferredGender,
+            x.Candidate.PhoneNumber,
+            x.Candidate.InstagramHandle,
+            x.Candidate.Latitude,
+            x.Candidate.Longitude,
+            x.Candidate.Interests.Select(i => new InterestDto(i.Id, i.Name, i.Emoji, i.Category)).ToList(),
+            x.Candidate.Photos.Select(p => new PhotoDto(p.Id, p.Url, p.IsPrimary, p.DisplayOrder)).ToList(),
+            x.Candidate.Prompts.Select(p => new StudentPromptDto(p.Id, p.PromptId, p.Question, p.Answer, p.DisplayOrder)).ToList()
+        ))
         .ToList();
         
-        return Ok(scored.Select(MapToDto).ToList());
+        return Ok(scored);
     }
     
     

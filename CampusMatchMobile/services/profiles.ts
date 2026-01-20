@@ -1,5 +1,5 @@
 // Profiles service using Supabase directly
-import { supabase, getCurrentUserId } from './supabase';
+import { supabase, getCurrentUserId, getStudentId } from './supabase';
 import {
     StudentDto,
     ProfileUpdateRequest,
@@ -31,23 +31,45 @@ const mapStudent = (row: any): StudentDto => ({
 export const profilesApi = {
     // Get current user's profile
     getMyProfile: async (): Promise<StudentDto> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        // Get the email from the current session/user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !user.email) throw new Error('Not authenticated');
 
+        // IMPORTANT: The Students table uses integer IDs, but Auth uses UUIDs.
+        // We link them by Email.
         const { data, error } = await supabase
             .from('Students')
             .select('*')
-            .eq('Id', userId)
+            .eq('Email', user.email)
             .single();
 
-        if (error) throw new Error(error.message);
+        if (error) {
+            console.warn('Profile not found via Email, returning default placeholder:', error.message);
+            // Return default object if not found (for new registrations)
+            return {
+                id: 0, // Placeholder ID until profile is created
+                email: user.email,
+                name: user.user_metadata?.name || 'User',
+                major: '',
+                year: '',
+                profileCompleted: false
+            } as StudentDto;
+        }
+
         return mapStudent(data);
     },
 
     // Update current user's profile
     updateMyProfile: async (profileData: ProfileUpdateRequest): Promise<StudentDto> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !user.email) throw new Error('Not authenticated');
+
+        // Find existing profile ID by email
+        const { data: existingProfile } = await supabase
+            .from('Students')
+            .select('Id')
+            .eq('Email', user.email)
+            .single();
 
         const updateData: any = {};
         if (profileData.name !== undefined) updateData.Name = profileData.name;
@@ -63,17 +85,38 @@ export const profilesApi = {
         if (profileData.latitude !== undefined) updateData.Latitude = profileData.latitude;
         if (profileData.longitude !== undefined) updateData.Longitude = profileData.longitude;
         if (profileData.photoUrl !== undefined) updateData.PhotoUrl = profileData.photoUrl;
-        updateData.LastActive = new Date().toISOString();
+        updateData.LastActiveAt = new Date().toISOString();
 
-        const { data, error } = await supabase
-            .from('Students')
-            .update(updateData)
-            .eq('Id', userId)
-            .select()
-            .single();
+        let resultData;
 
-        if (error) throw new Error(error.message);
-        return mapStudent(data);
+        if (existingProfile) {
+            // Update existing by Integer ID
+            const { data, error } = await supabase
+                .from('Students')
+                .update(updateData)
+                .eq('Id', existingProfile.Id)
+                .select()
+                .single();
+
+            if (error) throw new Error(error.message);
+            resultData = data;
+        } else {
+            // Insert new profile if it doesn't exist
+            const { data, error } = await supabase
+                .from('Students')
+                .insert({
+                    Email: user.email,
+                    ...updateData,
+                    CreatedAt: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+            if (error) throw new Error(error.message);
+            resultData = data;
+        }
+
+        return mapStudent(resultData);
     },
 
     // Get discover profiles (for swiping)
@@ -82,23 +125,31 @@ export const profilesApi = {
         maxAge?: number;
         gender?: string;
     }): Promise<StudentDto[]> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        // if (!studentId) {
+        //     // If no profile yet, return empty or handle gracefully
+        //     return [];
+        // }
 
         // Get already swiped profiles
-        const { data: swipes } = await supabase
-            .from('Swipes')
-            .select('SwipedId')
-            .eq('SwiperId', userId);
-
-        const swipedIds = swipes?.map(s => s.SwipedId) || [];
+        let swipedIds: number[] = [];
+        if (studentId) {
+            const { data: swipes } = await supabase
+                .from('Swipes')
+                .select('SwipedId')
+                .eq('SwiperId', studentId);
+            swipedIds = swipes?.map(s => s.SwipedId) || [];
+        }
 
         // Build query
         let query = supabase
             .from('Students')
             .select('*')
-            .neq('Id', userId)
             .limit(20);
+
+        if (studentId) {
+            query = query.neq('Id', studentId);
+        }
 
         // Filter out already swiped
         if (swipedIds.length > 0) {
@@ -156,13 +207,13 @@ export const profilesApi = {
 
     // Update user's interests
     updateInterests: async (interestIds: number[]): Promise<StudentDto> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        if (!studentId) throw new Error('Student profile not found');
 
         const { data, error } = await supabase
             .from('Students')
-            .update({ Interests: interestIds, LastActive: new Date().toISOString() })
-            .eq('Id', userId)
+            .update({ Interests: interestIds, LastActiveAt: new Date().toISOString() })
+            .eq('Id', studentId)
             .select()
             .single();
 

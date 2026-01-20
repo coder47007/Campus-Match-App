@@ -24,6 +24,7 @@ import FilterModal, { FilterState } from '@/components/FilterModal';
 import UniversityAutocomplete from '@/components/UniversityAutocomplete';
 import InterestSelector from '@/components/InterestSelector';
 import ProfileCompletionBar, { calculateProfileCompletion } from '@/components/ProfileCompletionBar';
+import { ProfileHeader, ProfilePhotos, ProfileActions } from '@/components/profile';
 import Colors from '@/constants/Colors';
 import { InterestItem } from '@/data/interests';
 
@@ -254,66 +255,21 @@ export default function ProfileScreen() {
                 </View>
 
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-                    {/* Profile Avatar Section */}
-                    <View style={styles.avatarSection}>
-                        <LinearGradient
-                            colors={['#7C3AED', '#6D28D9', '#5B21B6']}
-                            style={styles.avatarRing}
-                        >
-                            {mainPhoto?.url || user.photoUrl ? (
-                                <Image
-                                    source={{ uri: mainPhoto?.url || user.photoUrl }}
-                                    style={styles.avatar}
-                                />
-                            ) : (
-                                <View style={[styles.avatar, styles.noAvatar]}>
-                                    <Ionicons name="person" size={48} color={Colors.white} />
-                                </View>
-                            )}
-                        </LinearGradient>
+                    {/* Profile Avatar Section - Using extracted component */}
+                    <ProfileHeader
+                        name={user.name}
+                        age={user.age}
+                        photoUrl={mainPhoto?.url || user.photoUrl}
+                        isVerified={true}
+                    />
 
-                        <View style={styles.nameSection}>
-                            <Text style={styles.userName}>{user.name}, {user.age}</Text>
-                            <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
-                        </View>
-
-                        {/* Verified Badge */}
-                        <View style={styles.verifiedBadge}>
-                            <Ionicons name="shield-checkmark" size={14} color="#22C55E" />
-                            <Text style={styles.verifiedText}>Verified .edu Student</Text>
-                        </View>
-                    </View>
-
-                    {/* Action Buttons Row */}
-                    <View style={styles.actionsRow}>
-                        <TouchableOpacity
-                            style={styles.viewProfileButton}
-                            onPress={() => router.push(`/profile/${user.id}`)}
-                        >
-                            <Ionicons name="eye-outline" size={18} color={Colors.white} />
-                            <Text style={styles.viewProfileText}>View Profile</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.editButton}
-                            onPress={() => setIsEditing(!isEditing)}
-                        >
-                            <Text style={styles.editButtonText}>
-                                {isEditing ? 'Cancel' : 'Edit Profile'}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.iconButton}
-                            onPress={() => setShowFilterModal(true)}
-                        >
-                            <Ionicons name="options-outline" size={20} color={Colors.white} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.iconButton}
-                            onPress={() => router.push('/settings')}
-                        >
-                            <Ionicons name="settings-outline" size={20} color={Colors.white} />
-                        </TouchableOpacity>
-                    </View>
+                    {/* Action Buttons Row - Using extracted component */}
+                    <ProfileActions
+                        userId={user.id}
+                        isEditing={isEditing}
+                        onEditToggle={() => setIsEditing(!isEditing)}
+                        onFilterPress={() => setShowFilterModal(true)}
+                    />
 
                     {/* Profile Completion Bar */}
                     <ProfileCompletionBar
@@ -458,39 +414,13 @@ export default function ProfileScreen() {
                         ))}
                     </View>
 
-                    {/* My Photos Section */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>My Photos</Text>
-                        <View style={styles.photoGrid}>
-                            {[0, 1, 2, 3, 4, 5].map((index) => {
-                                const photo = photos[index];
-                                return (
-                                    <TouchableOpacity
-                                        key={index}
-                                        style={styles.photoSlot}
-                                        onPress={() => photo ? handleDeletePhoto(photo.id) : handleAddPhoto()}
-                                    >
-                                        {photo ? (
-                                            <>
-                                                <Image
-                                                    source={{ uri: photo.url }}
-                                                    style={styles.photo}
-                                                    resizeMode="cover"
-                                                />
-                                                <View style={styles.photoDeleteBadge}>
-                                                    <Ionicons name="close" size={12} color={Colors.white} />
-                                                </View>
-                                            </>
-                                        ) : (
-                                            <View style={styles.addPhotoPlaceholder}>
-                                                <Ionicons name="add" size={28} color="#7C3AED" />
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </View>
+                    {/* My Photos Section - Using extracted component */}
+                    <ProfilePhotos
+                        photos={photos}
+                        maxPhotos={6}
+                        onPhotosChange={fetchData}
+                        editable={true}
+                    />
 
                     {/* Bio Section */}
                     <View style={styles.section}>

@@ -1,6 +1,3 @@
-using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
-
 namespace CampusMatch.Api.Services;
 
 public interface IBlobStorageService
@@ -10,48 +7,9 @@ public interface IBlobStorageService
     string GetBlobUrl(string blobName);
 }
 
-public class AzureBlobStorageService : IBlobStorageService
-{
-    private readonly BlobContainerClient _containerClient;
-    private readonly string _containerUrl;
-    
-    public AzureBlobStorageService(IConfiguration configuration)
-    {
-        var connectionString = configuration["Azure:StorageConnectionString"] 
-            ?? "UseDevelopmentStorage=true";  // Azurite for local dev
-        var containerName = configuration["Azure:ContainerName"] ?? "photos";
-        
-        var blobServiceClient = new BlobServiceClient(connectionString);
-        _containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-        _containerClient.CreateIfNotExists(PublicAccessType.Blob);
-        
-        _containerUrl = _containerClient.Uri.ToString();
-    }
-    
-    public async Task<string> UploadAsync(Stream fileStream, string fileName, string contentType)
-    {
-        var blobName = $"{Guid.NewGuid()}{Path.GetExtension(fileName)}";
-        var blobClient = _containerClient.GetBlobClient(blobName);
-        
-        await blobClient.UploadAsync(fileStream, new BlobHttpHeaders 
-        { 
-            ContentType = contentType 
-        });
-        
-        return blobName;
-    }
-    
-    public async Task DeleteAsync(string blobName)
-    {
-        var blobClient = _containerClient.GetBlobClient(blobName);
-        await blobClient.DeleteIfExistsAsync();
-    }
-    
-    public string GetBlobUrl(string blobName)
-    {
-        return $"{_containerUrl}/{blobName}";
-    }
-}
+// NOTE: AzureBlobStorageService removed - not used in production
+// Production uses SupabaseStorageService, Development uses LocalFileStorageService
+
 
 // Fallback local storage for development without Azure
 public class LocalFileStorageService : IBlobStorageService

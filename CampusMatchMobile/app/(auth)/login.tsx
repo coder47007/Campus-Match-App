@@ -2,21 +2,21 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    TextInput,
+    TextInput as RNTextInput,
     TouchableOpacity,
     StyleSheet,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    ActivityIndicator,
     Alert,
     Image,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/authStore';
 import Colors from '@/constants/Colors';
+import Button from '@/components/ui/Button';
+import TextInput from '@/components/ui/TextInput';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -41,10 +41,7 @@ export default function LoginScreen() {
     };
 
     return (
-        <LinearGradient
-            colors={[Colors.dark.background, '#1a1a2e', Colors.dark.background]}
-            style={styles.container}
-        >
+        <View style={styles.container}>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
@@ -77,42 +74,25 @@ export default function LoginScreen() {
                             </View>
                         )}
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="mail-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Email"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                            />
-                        </View>
+                        <TextInput
+                            label="Email"
+                            leftIcon="mail-outline"
+                            placeholder="Email"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoComplete="email"
+                        />
 
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.textMuted} style={styles.inputIcon} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                                autoComplete="password"
-                            />
-                            <TouchableOpacity
-                                onPress={() => setShowPassword(!showPassword)}
-                                style={styles.showPasswordButton}
-                            >
-                                <Ionicons
-                                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                    size={20}
-                                    color={Colors.dark.textMuted}
-                                />
-                            </TouchableOpacity>
-                        </View>
+                        <TextInput
+                            label="Password"
+                            isPassword
+                            placeholder="Password"
+                            value={password}
+                            onChangeText={setPassword}
+                            autoComplete="password"
+                        />
 
                         <Link href="/(auth)/forgot-password" asChild>
                             <TouchableOpacity style={styles.forgotPassword}>
@@ -120,24 +100,16 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                         </Link>
 
-                        <TouchableOpacity
-                            style={styles.loginButton}
+                        <Button
+                            variant="primary"
+                            size="large"
                             onPress={handleLogin}
-                            disabled={isLoading}
+                            loading={isLoading}
+                            fullWidth
+                            accessibilityLabel="Sign in to your account"
                         >
-                            <LinearGradient
-                                colors={Colors.primary.gradient}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.loginButtonGradient}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator color={Colors.white} />
-                                ) : (
-                                    <Text style={styles.loginButtonText}>Sign In</Text>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
+                            Sign In
+                        </Button>
 
                         <View style={styles.divider}>
                             <View style={styles.dividerLine} />
@@ -146,9 +118,14 @@ export default function LoginScreen() {
                         </View>
 
                         <Link href="/(auth)/register" asChild>
-                            <TouchableOpacity style={styles.registerButton}>
-                                <Text style={styles.registerButtonText}>Create Account</Text>
-                            </TouchableOpacity>
+                            <Button
+                                variant="outline"
+                                size="large"
+                                fullWidth
+                                accessibilityLabel="Create a new account"
+                            >
+                                Create Account
+                            </Button>
                         </Link>
                     </View>
 
@@ -166,7 +143,7 @@ export default function LoginScreen() {
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
-        </LinearGradient>
+        </View>
     );
 }
 

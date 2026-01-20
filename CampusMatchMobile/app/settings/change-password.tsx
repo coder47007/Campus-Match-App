@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    TextInput,
+    TextInput as RNTextInput,
     StyleSheet,
     TouchableOpacity,
     Alert,
@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { authApi } from '@/services';
 import Colors from '@/constants/Colors';
+import Button from '@/components/ui/Button';
+import TextInput from '@/components/ui/TextInput';
 
 export default function ChangePasswordScreen() {
     const router = useRouter();
@@ -69,78 +70,41 @@ export default function ChangePasswordScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <View style={styles.content}>
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Current Password</Text>
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            value={currentPassword}
-                            onChangeText={setCurrentPassword}
-                            placeholder="Enter current password"
-                            placeholderTextColor={Colors.dark.textMuted}
-                            secureTextEntry={!showPasswords}
-                        />
-                        <TouchableOpacity
-                            onPress={() => setShowPasswords(!showPasswords)}
-                            style={styles.showPasswordButton}
-                        >
-                            <Ionicons
-                                name={showPasswords ? 'eye-off-outline' : 'eye-outline'}
-                                size={20}
-                                color={Colors.dark.textMuted}
-                            />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                <TextInput
+                    label="Current Password"
+                    isPassword
+                    placeholder="Enter current password"
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                />
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>New Password</Text>
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                            placeholder="Enter new password"
-                            placeholderTextColor={Colors.dark.textMuted}
-                            secureTextEntry={!showPasswords}
-                        />
-                    </View>
-                </View>
+                <TextInput
+                    label="New Password"
+                    isPassword
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    helperText="Password must be at least 6 characters long"
+                />
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Confirm New Password</Text>
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            value={confirmPassword}
-                            onChangeText={setConfirmPassword}
-                            placeholder="Confirm new password"
-                            placeholderTextColor={Colors.dark.textMuted}
-                            secureTextEntry={!showPasswords}
-                        />
-                    </View>
-                </View>
+                <TextInput
+                    label="Confirm New Password"
+                    isPassword
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                />
 
-                <Text style={styles.hint}>
-                    Password must be at least 6 characters long
-                </Text>
-
-                <TouchableOpacity
-                    style={styles.submitButton}
+                <Button
+                    variant="primary"
+                    size="large"
                     onPress={handleSubmit}
-                    disabled={isLoading}
+                    loading={isLoading}
+                    fullWidth
+                    accessibilityLabel="Change your password"
                 >
-                    <LinearGradient
-                        colors={Colors.primary.gradient}
-                        style={styles.submitButtonGradient}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color={Colors.white} />
-                        ) : (
-                            <Text style={styles.submitButtonText}>Change Password</Text>
-                        )}
-                    </LinearGradient>
-                </TouchableOpacity>
+                    Change Password
+                </Button>
             </View>
         </KeyboardAvoidingView>
     );

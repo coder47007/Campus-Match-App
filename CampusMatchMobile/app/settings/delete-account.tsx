@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authApi } from '@/services';
 import { useAuthStore } from '@/stores/authStore';
 import Colors from '@/constants/Colors';
+import Button from '@/components/ui/Button';
 
 export default function DeleteAccountScreen() {
     const router = useRouter();
@@ -123,23 +124,18 @@ export default function DeleteAccountScreen() {
                     </View>
                 </View>
 
-                <TouchableOpacity
-                    style={[
-                        styles.deleteButton,
-                        confirmText !== 'DELETE' && styles.deleteButtonDisabled,
-                    ]}
+                <Button
+                    variant="danger"
+                    size="large"
                     onPress={handleDeleteAccount}
-                    disabled={isLoading || confirmText !== 'DELETE'}
+                    loading={isLoading}
+                    disabled={confirmText !== 'DELETE'}
+                    leftIcon={<Ionicons name="trash" size={20} color={Colors.white} />}
+                    fullWidth
+                    accessibilityLabel="Permanently delete your account"
                 >
-                    {isLoading ? (
-                        <ActivityIndicator color={Colors.white} />
-                    ) : (
-                        <>
-                            <Ionicons name="trash" size={20} color={Colors.white} />
-                            <Text style={styles.deleteButtonText}>Delete My Account</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
+                    Delete My Account
+                </Button>
             </View>
         </KeyboardAvoidingView>
     );

@@ -1,12 +1,12 @@
 // Messages service using Supabase directly
-import { supabase, getCurrentUserId } from './supabase';
+import { supabase, getCurrentUserId, getStudentId } from './supabase';
 import { MessageDto, SendMessageRequest } from '../types';
 
 export const messagesApi = {
     // Get messages for a match
     getMessages: async (matchId: number): Promise<MessageDto[]> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        if (!studentId) throw new Error('Student profile not found');
 
         const { data, error } = await supabase
             .from('Messages')
@@ -39,21 +39,21 @@ export const messagesApi = {
 
     // Send a message
     sendMessage: async (data: SendMessageRequest): Promise<MessageDto> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        if (!studentId) throw new Error('Student profile not found');
 
         // Get sender name
         const { data: sender } = await supabase
             .from('Students')
             .select('Name')
-            .eq('Id', userId)
+            .eq('Id', studentId)
             .single();
 
         const { data: msg, error } = await supabase
             .from('Messages')
             .insert({
                 MatchId: data.matchId,
-                SenderId: userId,
+                SenderId: studentId,
                 Content: data.content,
                 SentAt: new Date().toISOString(),
             })
@@ -97,8 +97,8 @@ export const messagesApi = {
 
     // Mark messages as read
     markRead: async (matchId: number, messageIds: number[]): Promise<void> => {
-        const userId = await getCurrentUserId();
-        if (!userId) throw new Error('Not authenticated');
+        const studentId = await getStudentId();
+        if (!studentId) throw new Error('Student profile not found');
 
         const now = new Date().toISOString();
 
@@ -107,7 +107,7 @@ export const messagesApi = {
             .update({ ReadAt: now })
             .eq('MatchId', matchId)
             .in('Id', messageIds)
-            .neq('SenderId', userId)
+            .neq('SenderId', studentId)
             .is('ReadAt', null);
     },
 };

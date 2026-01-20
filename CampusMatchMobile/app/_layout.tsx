@@ -27,6 +27,12 @@ export const unstable_settings = {
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+import { LogBox } from 'react-native';
+LogBox.ignoreLogs([
+  'setLayoutAnimationEnabledExperimental', // Known issue in new arch
+  'SafeAreaView has been deprecated', // From older dependencies
+]);
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
