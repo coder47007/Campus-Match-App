@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using CampusMatch.Api.Data;
+using CampusMatch.Api.Models;
 using CampusMatch.Shared.DTOs;
 
 namespace CampusMatch.Api.Controllers;
@@ -21,11 +22,18 @@ public class LikesController : ControllerBase
     
     private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     
-    // Get blurred preview of who liked you (users who swiped right on you but you haven't swiped on them)
+    // Get who liked you - PREMIUM/GOLD ONLY for full profiles
+    // Free users get blurred preview with count only
     [HttpGet("received")]
-    public async Task<ActionResult<List<LikePreviewDto>>> GetReceivedLikes()
+    public async Task<ActionResult<object>> GetReceivedLikes()
     {
         var userId = GetUserId();
+        
+        // Check subscription for "see who liked you" feature
+        var subscription = await _db.Set<Subscription>()
+            .FirstOrDefaultAsync(s => s.StudentId == userId);
+        var plan = subscription?.Plan ?? "free";
+        var planFeatures = SubscriptionPlans.Plans.GetValueOrDefault(plan) ?? SubscriptionPlans.Plans["free"];
         
         // Get IDs of users you've already swiped on
         var swipedIds = await _db.Swipes
@@ -42,25 +50,57 @@ public class LikesController : ControllerBase
         var excludedIds = swipedIds.Concat(blockedIds).Distinct().ToHashSet();
         
         // Get users who liked you but you haven't swiped on
-        var likes = await _db.Swipes
+        var likesQuery = _db.Swipes
             .Include(s => s.Swiper)
+                .ThenInclude(st => st.Photos)
             .Where(s => s.SwipedId == userId && s.IsLike && !excludedIds.Contains(s.SwiperId))
             .OrderByDescending(s => s.IsSuperLike)
             .ThenByDescending(s => s.CreatedAt)
-            .Take(20)
+            .Take(20);
+        
+        // Premium/Gold users: Return full profile info
+        if (planFeatures.CanSeeWhoLikedYou)
+        {
+            var fullLikes = await likesQuery
+                .Select(s => new {
+                    id = s.SwiperId,
+                    name = s.Swiper.Name,
+                    age = s.Swiper.Age,
+                    photoUrl = s.Swiper.PhotoUrl ?? s.Swiper.Photos.OrderBy(p => p.DisplayOrder).Select(p => p.Url).FirstOrDefault(),
+                    major = s.Swiper.Major,
+                    university = s.Swiper.University,
+                    isSuperLike = s.IsSuperLike,
+                    likedAt = s.CreatedAt,
+                    isBlurred = false
+                })
+                .ToListAsync();
+            
+            return Ok(new {
+                canSeeWhoLikedYou = true,
+                likes = fullLikes
+            });
+        }
+        
+        // Free users: Return blurred previews only
+        var blurredLikes = await likesQuery
             .Select(s => new LikePreviewDto(
                 s.SwiperId,
-                null,  // Blurred photo URL (client can blur the actual photo)
+                s.Swiper.PhotoUrl ?? s.Swiper.Photos.OrderBy(p => p.DisplayOrder).Select(p => p.Url).FirstOrDefault(),  // Will be blurred on client
                 s.Swiper.Name.Length > 0 ? s.Swiper.Name[0].ToString() : "?",
                 s.IsSuperLike,
                 s.CreatedAt
             ))
             .ToListAsync();
         
-        return Ok(likes);
+        return Ok(new {
+            canSeeWhoLikedYou = false,
+            upgradeRequired = true,
+            likesCount = blurredLikes.Count,
+            likes = blurredLikes  // Photos will be blurred by client
+        });
     }
     
-    // Get count of likes received
+    // Get count of likes received (available to all users)
     [HttpGet("count")]
     public async Task<ActionResult<object>> GetLikesCount()
     {
@@ -85,10 +125,17 @@ public class LikesController : ControllerBase
         var superLikeCount = await _db.Swipes
             .CountAsync(s => s.SwipedId == userId && s.IsSuperLike && !excludedIds.Contains(s.SwiperId));
         
+        // Check if user has premium to see who liked them
+        var subscription = await _db.Set<Subscription>()
+            .FirstOrDefaultAsync(s => s.StudentId == userId);
+        var plan = subscription?.Plan ?? "free";
+        var planFeatures = SubscriptionPlans.Plans.GetValueOrDefault(plan) ?? SubscriptionPlans.Plans["free"];
+        
         return Ok(new { 
             total = count, 
             superLikes = superLikeCount,
-            hasNew = count > 0
+            hasNew = count > 0,
+            canSeeWhoLikedYou = planFeatures.CanSeeWhoLikedYou
         });
     }
 }

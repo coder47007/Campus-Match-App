@@ -6,4 +6,5 @@ export { useMatchStore } from './matchStore';
 export { useChatStore } from './chatStore';
 export { useSettingsStore } from './settingsStore';
 export { useThemeStore } from './themeStore';
+export { useSubscriptionStore } from './subscriptionStore';
 

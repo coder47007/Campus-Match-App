@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
     Modal,
     Dimensions,
     Switch,
+    Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 import Colors from '@/constants/Colors';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,6 +29,7 @@ interface FilterModalProps {
     onClose: () => void;
     onApply: (filters: FilterState) => void;
     initialFilters?: FilterState;
+    onUpgradePress?: () => void;
 }
 
 export interface FilterState {
@@ -36,9 +39,11 @@ export interface FilterState {
     showMe: 'men' | 'women' | 'everyone';
     academicYears: string[];
     majors: string[];
+    interests: number[];  // Interest IDs for filtering
     lookingFor: string[];
     verifiedOnly: boolean;
     greekLife: boolean;
+    crossCampus: boolean;  // Premium: match across campuses
 }
 
 const defaultFilters: FilterState = {
@@ -48,9 +53,11 @@ const defaultFilters: FilterState = {
     showMe: 'everyone',
     academicYears: [],
     majors: [],
+    interests: [],
     lookingFor: [],
     verifiedOnly: false,
     greekLife: false,
+    crossCampus: false,
 };
 
 const academicYearOptions = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Grad Student', 'Alumni'];
@@ -69,8 +76,11 @@ const lookingForOptions = [
     { id: 'activity', label: 'Activity Partner', icon: 'bicycle' },
 ];
 
-export default function FilterModal({ visible, onClose, onApply, initialFilters }: FilterModalProps) {
+export default function FilterModal({ visible, onClose, onApply, initialFilters, onUpgradePress }: FilterModalProps) {
     const [filters, setFilters] = useState<FilterState>(initialFilters || defaultFilters);
+    const { features } = useSubscriptionStore();
+    const hasAdvancedFilters = features?.advancedFilters ?? false;
+    const maxDistance = features?.maxDistanceKm ?? 50;
 
     const hasActiveFilters = useMemo(() => {
         return filters.distance !== 25 ||
@@ -79,8 +89,25 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
             filters.showMe !== 'everyone' ||
             filters.academicYears.length > 0 ||
             filters.majors.length > 0 ||
-            filters.lookingFor.length > 0;
+            filters.interests.length > 0 ||
+            filters.lookingFor.length > 0 ||
+            filters.crossCampus;
     }, [filters]);
+
+    const handlePremiumFilter = (filterName: string) => {
+        if (!hasAdvancedFilters) {
+            Alert.alert(
+                'Premium Feature',
+                `${filterName} is a premium feature. Upgrade to unlock advanced filters!`,
+                [
+                    { text: 'Not Now', style: 'cancel' },
+                    { text: 'Upgrade', onPress: onUpgradePress }
+                ]
+            );
+            return false;
+        }
+        return true;
+    };
 
     const toggleArrayItem = (array: string[], item: string) => {
         return array.includes(item)
@@ -126,17 +153,25 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
                             {/* Distance Slider */}
                             <View style={styles.filterItem}>
                                 <View style={styles.filterHeader}>
-                                    <Text style={styles.filterLabel}>Distance</Text>
+                                    <View style={styles.filterLabelRow}>
+                                        <Text style={styles.filterLabel}>Distance</Text>
+                                        {!hasAdvancedFilters && maxDistance <= 50 && (
+                                            <View style={styles.premiumBadge}>
+                                                <Ionicons name="diamond" size={10} color="#FFD700" />
+                                                <Text style={styles.premiumBadgeText}>200km</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                     <Text style={styles.filterValue}>
-                                        Within {filters.distance} {filters.distance === 1 ? 'mile' : 'miles'}
+                                        {filters.distance === maxDistance ? `${filters.distance}+ km` : `${filters.distance} km`}
                                     </Text>
                                 </View>
                                 <Slider
                                     style={styles.slider}
                                     minimumValue={1}
-                                    maximumValue={50}
-                                    step={1}
-                                    value={filters.distance}
+                                    maximumValue={hasAdvancedFilters ? 200 : 50}
+                                    step={hasAdvancedFilters ? 5 : 1}
+                                    value={Math.min(filters.distance, hasAdvancedFilters ? 200 : 50)}
                                     onValueChange={(val) => setFilters({ ...filters, distance: val })}
                                     minimumTrackTintColor="#7C3AED"
                                     maximumTrackTintColor="#3D3D5C"
@@ -213,21 +248,33 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>🎓 Campus Filters</Text>
 
-                            {/* Academic Year */}
+                            {/* Academic Year - Premium filter */}
                             <View style={styles.filterItem}>
-                                <Text style={styles.filterLabel}>Academic Year</Text>
-                                <View style={styles.pillsContainer}>
+                                <View style={styles.filterLabelRow}>
+                                    <Text style={styles.filterLabel}>Academic Year</Text>
+                                    {!hasAdvancedFilters && (
+                                        <View style={styles.premiumLock}>
+                                            <Ionicons name="lock-closed" size={12} color="#FFD700" />
+                                            <Text style={styles.premiumLockText}>Premium</Text>
+                                        </View>
+                                    )}
+                                </View>
+                                <View style={[styles.pillsContainer, !hasAdvancedFilters && styles.lockedSection]}>
                                     {academicYearOptions.map((year) => (
                                         <TouchableOpacity
                                             key={year}
                                             style={[
                                                 styles.pill,
                                                 filters.academicYears.includes(year) && styles.pillActive,
+                                                !hasAdvancedFilters && styles.pillDisabled,
                                             ]}
-                                            onPress={() => setFilters({
-                                                ...filters,
-                                                academicYears: toggleArrayItem(filters.academicYears, year),
-                                            })}
+                                            onPress={() => {
+                                                if (!handlePremiumFilter('Academic Year filter')) return;
+                                                setFilters({
+                                                    ...filters,
+                                                    academicYears: toggleArrayItem(filters.academicYears, year),
+                                                });
+                                            }}
                                         >
                                             <Text style={[
                                                 styles.pillText,
@@ -240,22 +287,34 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
                                 </View>
                             </View>
 
-                            {/* Major / Field of Study */}
+                            {/* Major / Field of Study - Premium filter */}
                             <View style={styles.filterItem}>
-                                <Text style={styles.filterLabel}>Major / Field of Study</Text>
+                                <View style={styles.filterLabelRow}>
+                                    <Text style={styles.filterLabel}>Major / Field of Study</Text>
+                                    {!hasAdvancedFilters && (
+                                        <View style={styles.premiumLock}>
+                                            <Ionicons name="lock-closed" size={12} color="#FFD700" />
+                                            <Text style={styles.premiumLockText}>Premium</Text>
+                                        </View>
+                                    )}
+                                </View>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                    <View style={styles.chipsContainer}>
+                                    <View style={[styles.chipsContainer, !hasAdvancedFilters && styles.lockedSection]}>
                                         {majorOptions.map((major) => (
                                             <TouchableOpacity
                                                 key={major.id}
                                                 style={[
                                                     styles.chip,
                                                     filters.majors.includes(major.id) && styles.chipActive,
+                                                    !hasAdvancedFilters && styles.pillDisabled,
                                                 ]}
-                                                onPress={() => setFilters({
-                                                    ...filters,
-                                                    majors: toggleArrayItem(filters.majors, major.id),
-                                                })}
+                                                onPress={() => {
+                                                    if (!handlePremiumFilter('Major filter')) return;
+                                                    setFilters({
+                                                        ...filters,
+                                                        majors: toggleArrayItem(filters.majors, major.id),
+                                                    });
+                                                }}
                                             >
                                                 <Text style={styles.chipEmoji}>{major.emoji}</Text>
                                                 <Text style={[
@@ -269,6 +328,27 @@ export default function FilterModal({ visible, onClose, onApply, initialFilters 
                                     </View>
                                 </ScrollView>
                             </View>
+
+                            {/* Cross-Campus Matching - Premium only */}
+                            {hasAdvancedFilters && (
+                                <View style={styles.premiumToggleItem}>
+                                    <View style={styles.premiumInfo}>
+                                        <View style={styles.premiumLabelRow}>
+                                            <Ionicons name="globe-outline" size={18} color="#7C3AED" />
+                                            <Text style={styles.filterLabel}>Cross-Campus Matching</Text>
+                                        </View>
+                                        <Text style={styles.premiumSubtext}>
+                                            Match with students from other universities
+                                        </Text>
+                                    </View>
+                                    <Switch
+                                        value={filters.crossCampus}
+                                        onValueChange={(val) => setFilters({ ...filters, crossCampus: val })}
+                                        trackColor={{ false: '#3D3D5C', true: '#7C3AED' }}
+                                        thumbColor={Colors.white}
+                                    />
+                                </View>
+                            )}
                         </View>
 
                         {/* Section C: Intent & Vibe */}
@@ -608,5 +688,56 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: Colors.white,
+    },
+    // New premium filter styles
+    filterLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    premiumBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 215, 0, 0.15)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        gap: 4,
+    },
+    premiumBadgeText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#FFD700',
+    },
+    premiumLock: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255, 215, 0, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    premiumLockText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#FFD700',
+    },
+    lockedSection: {
+        opacity: 0.5,
+    },
+    pillDisabled: {
+        opacity: 0.6,
+    },
+    premiumToggleItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: 'rgba(124, 58, 237, 0.1)',
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(124, 58, 237, 0.3)',
     },
 });

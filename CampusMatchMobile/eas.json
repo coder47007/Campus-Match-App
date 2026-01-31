@@ -14,13 +14,17 @@
         "buildType": "apk"
       },
       "env": {
-        "API_URL": "https://full-buses-relax.loca.lt"
+        "API_URL": "https://full-buses-relax.loca.lt",
+        "SUPABASE_URL": "https://urtynghfmszehjwvligg.supabase.co",
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydHluZ2hmbXN6ZWhqd3ZsaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDk2MDEsImV4cCI6MjA4Mzk4NTYwMX0.nLQd8gmmRH76HaYZ4kkOTbwTnm8EiOtdJ6GF9aHuEuA"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "API_URL": "https://api.your-production-url.com"
+        "API_URL": "https://api.campusmatch.edu",
+        "SUPABASE_URL": "https://urtynghfmszehjwvligg.supabase.co",
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydHluZ2hmbXN6ZWhqd3ZsaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDk2MDEsImV4cCI6MjA4Mzk4NTYwMX0.nLQd8gmmRH76HaYZ4kkOTbwTnm8EiOtdJ6GF9aHuEuA"
       }
     }
   },

@@ -10,6 +10,7 @@ import {
     ScrollView,
     ActivityIndicator,
     Alert,
+    Image,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,7 +78,8 @@ export default function RegisterScreen() {
                 phoneNumber: phoneNumber.trim(),
                 instagramHandle: instagramHandle.trim() || undefined,
             });
-            router.replace('/(tabs)/discover');
+            // New users go to profile setup first
+            router.replace('/(onboarding)/profile-setup' as any);
         } catch (err) {
             // Error is handled by store
         }
@@ -101,6 +103,13 @@ export default function RegisterScreen() {
                                 <Ionicons name="arrow-back" size={24} color={Colors.white} />
                             </TouchableOpacity>
                         </Link>
+                        <View style={styles.logoContainer}>
+                            <Image
+                                source={require('@/assets/images/campus-match-logo.png')}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
+                        </View>
                         <Text style={styles.title}>Create Account</Text>
                         <Text style={styles.subtitle}>Join CampusMatch today</Text>
                     </View>
@@ -211,9 +220,19 @@ const styles = StyleSheet.create({
     },
     header: {
         marginBottom: 32,
+        alignItems: 'center',
     },
     backButton: {
         marginBottom: 16,
+        alignSelf: 'flex-start',
+    },
+    logoContainer: {
+        marginBottom: 16,
+    },
+    logoImage: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
     },
     title: {
         fontSize: 32,

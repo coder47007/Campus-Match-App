@@ -1,12 +1,15 @@
 import Constants from 'expo-constants';
 
-// Supabase Configuration - Direct connection (no backend needed)
-export const SUPABASE_URL = 'https://urtynghfmszehjwvligg.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydHluZ2hmbXN6ZWhqd3ZsaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDk2MDEsImV4cCI6MjA4Mzk4NTYwMX0.nLQd8gmmRH76HaYZ4kkOTbwTnm8EiOtdJ6GF9aHuEuA';
-
-// Legacy API Configuration (kept for reference, not used)
+// Environment variables or fallback to development values
 const extra = Constants.expoConfig?.extra;
-export const API_BASE_URL = extra?.apiUrl || 'http://10.0.0.56:5229';
+
+// Supabase Configuration
+export const SUPABASE_URL = extra?.supabaseUrl || process.env.SUPABASE_URL || 'https://urtynghfmszehjwvligg.supabase.co';
+export const SUPABASE_ANON_KEY = extra?.supabaseAnonKey || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVydHluZ2hmbXN6ZWhqd3ZsaWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MDk2MDEsImV4cCI6MjA4Mzk4NTYwMX0.nLQd8gmmRH76HaYZ4kkOTbwTnm8EiOtdJ6GF9aHuEuA';
+
+// API Configuration
+// Priority: 1. EAS Build env (extra.apiUrl) -> 2. .env file -> 3. Local fallback
+export const API_BASE_URL = extra?.apiUrl || process.env.API_BASE_URL || 'http://10.0.0.56:5229';
 
 // SignalR Hub URL
 export const SIGNALR_HUB_URL = `${API_BASE_URL}/chathub`;

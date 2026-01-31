@@ -84,13 +84,26 @@ function RootLayoutNav() {
     if (!authChecked || !isInitialized || themeLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inOnboarding = segments[0] === '(onboarding)';
+    const inTabs = segments[0] === '(tabs)';
 
     if (!user && !inAuthGroup) {
       // Redirect to login if not authenticated
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
-      // Redirect to main app if authenticated
-      router.replace('/(tabs)/discover');
+      // Authenticated user in auth group - check profile completion
+      const profileComplete = (user.photos?.length ?? 0) >= 3;
+      if (profileComplete) {
+        router.replace('/(tabs)/discover');
+      } else {
+        router.replace('/(onboarding)/profile-setup' as any);
+      }
+    } else if (user && inTabs) {
+      // User trying to access tabs - verify profile is complete
+      const profileComplete = (user.photos?.length ?? 0) >= 3;
+      if (!profileComplete) {
+        router.replace('/(onboarding)/profile-setup' as any);
+      }
     }
   }, [user, segments, authChecked, isInitialized, themeLoading]);
 

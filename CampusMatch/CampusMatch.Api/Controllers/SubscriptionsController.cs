@@ -31,10 +31,75 @@ public class SubscriptionsController : ControllerBase
         var userId = GetUserId();
         var subscription = await GetOrCreateSubscription(userId);
         
-        // Reset daily/monthly limits if needed
+        // Reset limits if needed
         await ResetLimitsIfNeeded(subscription);
         
         return Ok(MapToDto(subscription));
+    }
+
+    // GET: api/subscriptions/swipes - Get swipe status for free user limit tracking
+    [HttpGet("swipes")]
+    public async Task<ActionResult<SwipeStatusResponse>> GetSwipeStatus()
+    {
+        var userId = GetUserId();
+        var subscription = await GetOrCreateSubscription(userId);
+        await ResetLimitsIfNeeded(subscription);
+
+        var features = SubscriptionPlans.Plans[subscription.Plan];
+        
+        return Ok(new SwipeStatusResponse
+        {
+            SwipesRemaining = subscription.SwipesRemaining,
+            IsUnlimited = features.UnlimitedSwipes,
+            ResetsAt = features.UnlimitedSwipes ? null : subscription.LastSwipeReset.AddHours(features.SwipePeriodHours)
+        });
+    }
+
+    // POST: api/subscriptions/use-swipe - Use a swipe (called before each swipe action)
+    [HttpPost("use-swipe")]
+    public async Task<ActionResult<SwipeStatusResponse>> UseSwipe()
+    {
+        var userId = GetUserId();
+        var subscription = await GetOrCreateSubscription(userId);
+        await ResetLimitsIfNeeded(subscription);
+
+        var features = SubscriptionPlans.Plans[subscription.Plan];
+        
+        // Check if unlimited
+        if (features.UnlimitedSwipes)
+        {
+            return Ok(new SwipeStatusResponse
+            {
+                SwipesRemaining = 999,
+                IsUnlimited = true,
+                ResetsAt = null
+            });
+        }
+        
+        // Check if has swipes remaining
+        if (subscription.SwipesRemaining <= 0)
+        {
+            var resetsAt = subscription.LastSwipeReset.AddHours(features.SwipePeriodHours);
+            return BadRequest(new { 
+                error = "No swipes remaining",
+                upgradeRequired = true,
+                swipesRemaining = 0,
+                resetsAt = resetsAt,
+                hoursUntilReset = Math.Max(0, (resetsAt - DateTime.UtcNow).TotalHours)
+            });
+        }
+
+        // Decrement swipes
+        subscription.SwipesRemaining--;
+        subscription.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new SwipeStatusResponse
+        {
+            SwipesRemaining = subscription.SwipesRemaining,
+            IsUnlimited = false,
+            ResetsAt = subscription.LastSwipeReset.AddHours(features.SwipePeriodHours)
+        });
     }
 
     // GET: api/subscriptions/plans - Get all available plans
@@ -69,7 +134,8 @@ public class SubscriptionsController : ControllerBase
         subscription.EndDate = DateTime.UtcNow.AddMonths(1); // 1-month subscription
         subscription.SuperLikesRemaining = planFeatures.SuperLikesPerDay == -1 ? 999 : planFeatures.SuperLikesPerDay;
         subscription.RewindsRemaining = planFeatures.RewindsPerDay == -1 ? 999 : planFeatures.RewindsPerDay;
-        subscription.BoostsRemaining = planFeatures.BoostsPerMonth;
+        subscription.BoostsRemaining = planFeatures.BoostsPerPeriod == -1 ? 999 : planFeatures.BoostsPerPeriod;
+        subscription.SwipesRemaining = planFeatures.UnlimitedSwipes ? 999 : planFeatures.SwipesPerPeriod;
         subscription.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -177,16 +243,26 @@ public class SubscriptionsController : ControllerBase
         var subscription = await GetOrCreateSubscription(userId);
         await ResetLimitsIfNeeded(subscription);
 
-        if (subscription.BoostsRemaining <= 0)
+        var features = SubscriptionPlans.Plans[subscription.Plan];
+
+        // Check boost limits for free users (1 per 10 days)
+        if (features.BoostsPerPeriod != -1 && subscription.BoostsRemaining <= 0)
         {
+            var resetsAt = subscription.LastBoostReset.AddDays(features.BoostPeriodDays);
             return BadRequest(new { 
                 error = "No boosts remaining",
+                resetsAt = resetsAt,
+                daysUntilReset = Math.Max(0, (resetsAt - DateTime.UtcNow).TotalDays),
                 canPurchase = true
             });
         }
 
-        subscription.BoostsRemaining--;
-        await _db.SaveChangesAsync();
+        // Decrement boosts for non-unlimited users
+        if (features.BoostsPerPeriod != -1)
+        {
+            subscription.BoostsRemaining--;
+            await _db.SaveChangesAsync();
+        }
 
         // Update user's boost status (boost lasts 30 minutes)
         var user = await _db.Students.FindAsync(userId);
@@ -199,7 +275,8 @@ public class SubscriptionsController : ControllerBase
 
         return Ok(new { 
             message = "Boost activated for 30 minutes!",
-            boostsRemaining = subscription.BoostsRemaining,
+            boostsRemaining = features.BoostsPerPeriod == -1 ? 999 : subscription.BoostsRemaining,
+            isUnlimited = features.BoostsPerPeriod == -1,
             expiresAt = DateTime.UtcNow.AddMinutes(30)
         });
     }
@@ -230,13 +307,15 @@ public class SubscriptionsController : ControllerBase
 
         if (subscription == null)
         {
+            var freeFeatures = SubscriptionPlans.Plans["free"];
             subscription = new Subscription
             {
                 StudentId = userId,
                 Plan = "free",
-                SuperLikesRemaining = 1,
-                RewindsRemaining = 0,
-                BoostsRemaining = 0,
+                SuperLikesRemaining = freeFeatures.SuperLikesPerDay,
+                RewindsRemaining = freeFeatures.RewindsPerDay,
+                BoostsRemaining = freeFeatures.BoostsPerPeriod,
+                SwipesRemaining = freeFeatures.SwipesPerPeriod,
                 CreatedAt = DateTime.UtcNow
             };
             _db.Set<Subscription>().Add(subscription);
@@ -268,16 +347,25 @@ public class SubscriptionsController : ControllerBase
             changed = true;
         }
 
-        // Reset boosts monthly
-        if ((now - subscription.LastBoostReset).TotalDays >= 30)
+        // Reset swipes based on plan period (16 hours for free)
+        if (features.SwipePeriodHours > 0 && (now - subscription.LastSwipeReset).TotalHours >= features.SwipePeriodHours)
         {
-            subscription.BoostsRemaining = features.BoostsPerMonth;
+            subscription.SwipesRemaining = features.SwipesPerPeriod;
+            subscription.LastSwipeReset = now;
+            changed = true;
+        }
+
+        // Reset boosts based on plan period (10 days for free)
+        if (features.BoostPeriodDays > 0 && (now - subscription.LastBoostReset).TotalDays >= features.BoostPeriodDays)
+        {
+            subscription.BoostsRemaining = features.BoostsPerPeriod;
             subscription.LastBoostReset = now;
             changed = true;
         }
 
         if (changed)
         {
+            subscription.UpdatedAt = now;
             await _db.SaveChangesAsync();
         }
     }
@@ -295,7 +383,10 @@ public class SubscriptionsController : ControllerBase
             EndDate = subscription.EndDate,
             SuperLikesRemaining = subscription.SuperLikesRemaining,
             RewindsRemaining = subscription.RewindsRemaining,
-            BoostsRemaining = subscription.BoostsRemaining,
+            BoostsRemaining = features.BoostsPerPeriod == -1 ? 999 : subscription.BoostsRemaining,
+            SwipesRemaining = features.UnlimitedSwipes ? 999 : subscription.SwipesRemaining,
+            SwipesResetAt = features.UnlimitedSwipes ? null : subscription.LastSwipeReset.AddHours(features.SwipePeriodHours),
+            BoostsResetAt = features.BoostsPerPeriod == -1 ? null : subscription.LastBoostReset.AddDays(features.BoostPeriodDays),
             Features = features
         };
     }

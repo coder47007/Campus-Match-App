@@ -1,18 +1,25 @@
 // Subscription Service - Mobile integration with Premium features
-import { api, getAuthToken } from './api';
+import { api } from './api';
 
 export interface PlanFeatures {
     name: string;
     price: number;
     superLikesPerDay: number;
     rewindsPerDay: number;
-    boostsPerMonth: number;
-    seeWhoLikesYou: boolean;
-    unlimitedLikes: boolean;
+    boostsPerPeriod: number;
+    boostPeriodDays: number;
+    swipesPerPeriod: number;
+    swipePeriodHours: number;
+    maxDistanceKm: number;
+    crossCampusMatching: boolean;
+    canSeeWhoLikedYou: boolean;
+    unlimitedSwipes: boolean;
     advancedFilters: boolean;
-    priorityMatches: boolean;
     readReceipts: boolean;
+    typingIndicators: boolean;
+    highlightedBadge: boolean;
     noAds: boolean;
+    priorityMatching: boolean;
 }
 
 export interface SubscriptionDto {
@@ -23,12 +30,22 @@ export interface SubscriptionDto {
     superLikesRemaining: number;
     rewindsRemaining: number;
     boostsRemaining: number;
+    swipesRemaining?: number;
+    swipesResetAt?: string | null;
+    boostsResetAt?: string | null;
     features: PlanFeatures;
 }
 
 export interface UpgradeRequest {
-    plan: 'plus' | 'gold' | 'platinum';
+    plan: 'premium' | 'gold';
     paymentToken?: string;
+}
+
+export interface SwipeStatusResponse {
+    swipesRemaining: number;
+    isUnlimited: boolean;
+    resetsAt: string | null;
+    canSwipe: boolean;
 }
 
 class SubscriptionsService {
@@ -39,6 +56,22 @@ class SubscriptionsService {
      */
     async getSubscription(): Promise<SubscriptionDto> {
         const response = await api.get<SubscriptionDto>(this.apiUrl);
+        return response.data;
+    }
+
+    /**
+     * Get swipe status (for free user limit tracking)
+     */
+    async getSwipeStatus(): Promise<SwipeStatusResponse> {
+        const response = await api.get<SwipeStatusResponse>(`${this.apiUrl}/swipes`);
+        return response.data;
+    }
+
+    /**
+     * Use a swipe (call before each swipe for free users)
+     */
+    async useSwipe(): Promise<SwipeStatusResponse> {
+        const response = await api.post<SwipeStatusResponse>(`${this.apiUrl}/use-swipe`);
         return response.data;
     }
 
@@ -87,8 +120,8 @@ class SubscriptionsService {
     /**
      * Use a profile boost (30 minutes of visibility)
      */
-    async useBoost(): Promise<{ message: string; boostsRemaining: number; expiresAt: string }> {
-        const response = await api.post<{ message: string; boostsRemaining: number; expiresAt: string }>(`${this.apiUrl}/use-boost`);
+    async useBoost(): Promise<{ message: string; boostsRemaining: number; expiresAt: string; isUnlimited?: boolean }> {
+        const response = await api.post<{ message: string; boostsRemaining: number; expiresAt: string; isUnlimited?: boolean }>(`${this.apiUrl}/use-boost`);
         return response.data;
     }
 

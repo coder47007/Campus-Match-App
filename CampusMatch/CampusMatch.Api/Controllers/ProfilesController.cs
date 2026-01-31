@@ -124,11 +124,18 @@ public class ProfilesController : ControllerBase
         [FromQuery] int? minAge = null,
         [FromQuery] int? maxAge = null,
         [FromQuery] string? gender = null,
-        [FromQuery] int? maxDistance = null,
+        [FromQuery] int? maxDistance = null,  // km - only for premium/gold users
         [FromQuery] string? academicYears = null,  // comma-separated
-        [FromQuery] string? majors = null)  // comma-separated
+        [FromQuery] string? majors = null,  // comma-separated
+        [FromQuery] string? interests = null)  // comma-separated interest IDs
     {
         var userId = GetUserId();
+        
+        // Get user's subscription to check features
+        var subscription = await _db.Set<Subscription>()
+            .FirstOrDefaultAsync(s => s.StudentId == userId);
+        var plan = subscription?.Plan ?? "free";
+        var planFeatures = SubscriptionPlans.Plans.GetValueOrDefault(plan) ?? SubscriptionPlans.Plans["free"];
         
         // OPTIMIZED: Get current user with only needed fields
         var currentUserData = await _db.Students
@@ -138,6 +145,8 @@ public class ProfilesController : ControllerBase
                 s.MaxAgePreference,
                 s.PreferredGender,
                 s.University,
+                s.Latitude,
+                s.Longitude,
                 InterestIds = s.Interests.Select(i => i.InterestId).ToList()
             })
             .FirstOrDefaultAsync();
@@ -161,6 +170,21 @@ public class ProfilesController : ControllerBase
         var candidatesQuery = _db.Students
             .Where(s => s.Id != userId && !excludedIdsSet.Contains(s.Id) && !s.IsAdmin)
             .Where(s => !s.IsProfileHidden && !s.IsBanned);
+        
+        // CAMPUS/DISTANCE FILTERING based on subscription
+        // Free users: Same campus only
+        // Premium/Gold: Cross-campus matching with distance filter
+        if (!planFeatures.CrossCampusMatching)
+        {
+            // Free users - same university only
+            if (!string.IsNullOrEmpty(currentUserData.University))
+            {
+                candidatesQuery = candidatesQuery.Where(s => 
+                    s.University == currentUserData.University || string.IsNullOrEmpty(s.University)
+                );
+            }
+        }
+        // Note: Distance filtering is done in C# after fetch since SQL doesn't have Haversine
         
         // Apply age filter (use provided params or user preferences)
         var filterMinAge = minAge ?? currentUserData.MinAgePreference;
@@ -188,34 +212,54 @@ public class ProfilesController : ControllerBase
             );
         }
         
-        // Apply academic year filter
-        if (!string.IsNullOrEmpty(academicYears))
+        // ADVANCED FILTERS - Only for Premium/Gold users
+        if (planFeatures.AdvancedFilters)
         {
-            var yearsList = academicYears.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(y => y.Trim())
-                .ToList();
-                
-            if (yearsList.Any())
+            // Apply academic year filter
+            if (!string.IsNullOrEmpty(academicYears))
             {
-                candidatesQuery = candidatesQuery.Where(s => 
-                    string.IsNullOrEmpty(s.Year) || yearsList.Contains(s.Year)
-                );
+                var yearsList = academicYears.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(y => y.Trim())
+                    .ToList();
+                    
+                if (yearsList.Any())
+                {
+                    candidatesQuery = candidatesQuery.Where(s => 
+                        string.IsNullOrEmpty(s.Year) || yearsList.Contains(s.Year)
+                    );
+                }
             }
-        }
-        
-        // Apply major filter
-        if (!string.IsNullOrEmpty(majors))
-        {
-            var majorsList = majors.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                .Select(m => m.Trim().ToLower())
-                .ToList();
-                
-            if (majorsList.Any())
+            
+            // Apply major filter
+            if (!string.IsNullOrEmpty(majors))
             {
-                candidatesQuery = candidatesQuery.Where(s => 
-                    string.IsNullOrEmpty(s.Major) || 
-                    majorsList.Any(m => s.Major.ToLower().Contains(m))
-                );
+                var majorsList = majors.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(m => m.Trim().ToLower())
+                    .ToList();
+                    
+                if (majorsList.Any())
+                {
+                    candidatesQuery = candidatesQuery.Where(s => 
+                        string.IsNullOrEmpty(s.Major) || 
+                        majorsList.Any(m => s.Major.ToLower().Contains(m))
+                    );
+                }
+            }
+            
+            // Apply interest filter
+            if (!string.IsNullOrEmpty(interests))
+            {
+                var interestIdsList = interests.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(i => int.TryParse(i.Trim(), out var id) ? id : 0)
+                    .Where(id => id > 0)
+                    .ToList();
+                    
+                if (interestIdsList.Any())
+                {
+                    candidatesQuery = candidatesQuery.Where(s =>
+                        s.Interests.Any(si => interestIdsList.Contains(si.InterestId))
+                    );
+                }
             }
         }
         
@@ -238,6 +282,8 @@ public class ProfilesController : ControllerBase
                 s.Latitude,
                 s.Longitude,
                 s.LastActiveAt,
+                s.IsBoosted,
+                s.BoostExpiresAt,
                 InterestIds = s.Interests.Select(i => i.InterestId).ToList(),
                 Interests = s.Interests.Select(si => new { 
                     si.Interest.Id, 
@@ -261,19 +307,58 @@ public class ProfilesController : ControllerBase
             })
             .ToListAsync();
         
+        // DISTANCE FILTERING (for Premium/Gold users with location data)
+        var effectiveMaxDistance = planFeatures.CrossCampusMatching 
+            ? Math.Min(maxDistance ?? planFeatures.MaxDistanceKm, planFeatures.MaxDistanceKm)
+            : 0;
+            
+        if (effectiveMaxDistance > 0 && currentUserData.Latitude.HasValue && currentUserData.Longitude.HasValue)
+        {
+            candidates = candidates.Where(c =>
+            {
+                if (!c.Latitude.HasValue || !c.Longitude.HasValue) return true; // Include users without location
+                
+                var distance = CalculateDistanceKm(
+                    currentUserData.Latitude.Value, currentUserData.Longitude.Value,
+                    c.Latitude.Value, c.Longitude.Value
+                );
+                
+                return distance <= effectiveMaxDistance;
+            }).ToList();
+        }
+        
         // Score and rank candidates (done in C# after fetching minimal data)
+        var now = DateTime.UtcNow;
         var scored = candidates.Select(c =>
         {
             var theirInterestIds = c.InterestIds.ToHashSet();
             var sharedInterests = myInterestIds.Intersect(theirInterestIds).Count();
             
             int score = 0;
+            
+            // Boosted profiles appear first (if boost is active)
+            if (c.IsBoosted && c.BoostExpiresAt.HasValue && c.BoostExpiresAt > now)
+            {
+                score += 1000;  // Boosted priority
+            }
+            
             score += sharedInterests * 10;  // 10 points per shared interest
             score += c.University == currentUserData.University ? 20 : 0;  // Same university bonus
-            score += c.LastActiveAt > DateTime.UtcNow.AddDays(-1) ? 15 : 0;  // Recently active bonus
-            score += c.LastActiveAt > DateTime.UtcNow.AddDays(-7) ? 5 : 0;  // Active in week bonus
+            score += c.LastActiveAt > now.AddDays(-1) ? 15 : 0;  // Recently active bonus
+            score += c.LastActiveAt > now.AddDays(-7) ? 5 : 0;  // Active in week bonus
             
-            return (Candidate: c, Score: score);
+            // Calculate distance for display (if both have location)
+            double? distanceKm = null;
+            if (currentUserData.Latitude.HasValue && currentUserData.Longitude.HasValue &&
+                c.Latitude.HasValue && c.Longitude.HasValue)
+            {
+                distanceKm = CalculateDistanceKm(
+                    currentUserData.Latitude.Value, currentUserData.Longitude.Value,
+                    c.Latitude.Value, c.Longitude.Value
+                );
+            }
+            
+            return (Candidate: c, Score: score, DistanceKm: distanceKm);
         })
         .OrderByDescending(x => x.Score)
         .ThenBy(_ => Guid.NewGuid())  // Randomize within same score
@@ -302,6 +387,25 @@ public class ProfilesController : ControllerBase
         
         return Ok(scored);
     }
+    
+    // Haversine formula to calculate distance between two coordinates
+    private static double CalculateDistanceKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371; // Earth's radius in km
+        
+        var dLat = ToRadians(lat2 - lat1);
+        var dLon = ToRadians(lon2 - lon1);
+        
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        
+        return R * c;
+    }
+    
+    private static double ToRadians(double degrees) => degrees * Math.PI / 180;
     
     
     

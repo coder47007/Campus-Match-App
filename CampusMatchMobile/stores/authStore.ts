@@ -15,12 +15,16 @@ interface AuthState {
     isInitialized: boolean;
     error: string | null;
 
+    // Computed
+    isProfileComplete: boolean;
+
     // Actions
     login: (email: string, password: string) => Promise<void>;
     register: (data: RegisterRequest) => Promise<void>;
     logout: () => Promise<void>;
     loadStoredAuth: () => Promise<boolean>;
     updateUser: (user: StudentDto) => void;
+    refreshProfile: () => Promise<void>;
     clearError: () => void;
 }
 
@@ -31,6 +35,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     isLoading: false,
     isInitialized: false,
     error: null,
+
+    // Computed: Profile is complete when user has at least 3 photos
+    get isProfileComplete() {
+        const { user } = get();
+        if (!user) return false;
+        return (user.photos?.length ?? 0) >= 3;
+    },
 
     // Login
     login: async (email: string, password: string) => {
@@ -155,6 +166,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     updateUser: (user: StudentDto) => {
         set({ user });
         setStorageItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+    },
+
+    // Refresh profile from server (used after photo uploads)
+    refreshProfile: async () => {
+        try {
+            const freshUser = await profilesApi.getMyProfile();
+            set({ user: freshUser });
+            await setStorageItem(STORAGE_KEYS.USER_DATA, JSON.stringify(freshUser));
+        } catch (error) {
+            console.error('Failed to refresh profile:', error);
+        }
     },
 
     // Clear error

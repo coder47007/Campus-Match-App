@@ -23,6 +23,7 @@ import LocationPicker from '@/components/LocationPicker';
 import { useChatStore } from '@/stores/chatStore';
 import { useMatchStore } from '@/stores/matchStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { signalRService } from '@/services/signalr';
 import { matchesApi } from '@/services/matches';
 import { MessageDto } from '@/types';
@@ -58,6 +59,9 @@ export default function ChatScreen() {
     const match = matches.find(m => m.id === matchIdNum);
     const chatMessages = messages[matchIdNum] || [];
     const isOtherTyping = typingUsers[matchIdNum];
+
+    // Subscription-gated features
+    const { hasReadReceipts, hasTypingIndicators } = useSubscriptionStore();
 
     useEffect(() => {
         if (matchIdNum) {
@@ -196,7 +200,7 @@ export default function ChatScreen() {
                     </View>
                     <View style={[styles.messageFooter, isMine && styles.myMessageFooter]}>
                         <Text style={styles.messageTime}>{formatTime(item.sentAt)}</Text>
-                        {isMine && (
+                        {isMine && hasReadReceipts && (
                             <Ionicons
                                 name={item.isRead ? 'checkmark-done' : 'checkmark'}
                                 size={14}
@@ -241,7 +245,7 @@ export default function ChatScreen() {
                             )}
                             <View>
                                 <Text style={styles.headerName}>{match.otherStudentName}</Text>
-                                {isOtherTyping && (
+                                {hasTypingIndicators && isOtherTyping && (
                                     <Text style={styles.typingText}>typing...</Text>
                                 )}
                             </View>

@@ -15,10 +15,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDiscoverStore } from '@/stores/discoverStore';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import SwipeCard from '@/components/SwipeCard';
 import MatchPopup from '@/components/MatchPopup';
 import FilterModal, { FilterState } from '@/components/FilterModal';
 import EmptyState from '@/components/ui/EmptyState';
+import { SwipeLimitBanner, PremiumPaywall } from '@/components/premium';
 import Colors from '@/constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -29,6 +31,8 @@ export default function DiscoverScreen() {
     const [showFilterModal, setShowFilterModal] = useState(false);
     const [hasActiveFilters, setHasActiveFilters] = useState(false);
     const [filters, setFilters] = useState<FilterState | null>(null);
+    const [showPaywall, setShowPaywall] = useState(false);
+    const [paywallFeature, setPaywallFeature] = useState<'likes' | 'rewind' | 'filters' | 'swipes' | 'boost' | 'general'>('swipes');
     const [notifyNewStudents, setNotifyNewStudents] = useState(false);
 
     const {
@@ -46,11 +50,21 @@ export default function DiscoverScreen() {
         setNewMatch,
     } = useDiscoverStore();
 
+    // Subscription state
+    const {
+        swipesRemaining,
+        features,
+        canRewind,
+        fetchSubscription,
+        useSwipe,
+    } = useSubscriptionStore();
+
     const cardRef = useRef<{ triggerSwipe: (direction: 'left' | 'right' | 'up') => void } | null>(null);
 
     useEffect(() => {
         fetchProfiles();
         fetchRewindsRemaining();
+        fetchSubscription(); // Load subscription status
     }, []);
 
     const currentProfile = profiles[currentIndex];
@@ -61,12 +75,27 @@ export default function DiscoverScreen() {
         const isLike = direction === 'right';
         const isSuperLike = direction === 'up';
 
+        // Check swipe limit for likes/superlikes (pass is always allowed)
+        if ((isLike || isSuperLike) && !features?.unlimitedSwipes) {
+            if (swipesRemaining <= 0) {
+                setPaywallFeature('swipes');
+                setShowPaywall(true);
+                return;
+            }
+            // Use a swipe (decrement counter)
+            const canSwipe = await useSwipe();
+            if (!canSwipe) {
+                setPaywallFeature('swipes');
+                setShowPaywall(true);
+                return;
+            }
+        }
+
         try {
             await swipe(currentProfile.id, isLike || isSuperLike, isSuperLike);
         } catch (err: any) {
             console.error('Swipe error ignored:', err.message);
             // Do not block UI, just log it. The swipe optimistic update will handle it.
-            // If we set 'setError', it shows the "Cloud Offline" screen which blocks usage.
         }
     };
 
@@ -218,6 +247,12 @@ export default function DiscoverScreen() {
 
                 </View>
 
+                {/* Swipe Limit Banner (for free users) */}
+                <SwipeLimitBanner onUpgradePress={() => {
+                    setPaywallFeature('swipes');
+                    setShowPaywall(true);
+                }} />
+
                 {/* Card Stack */}
                 <View style={styles.cardStack}>
                     {profiles.slice(currentIndex, currentIndex + 3).reverse().map((profile, index) => (
@@ -259,6 +294,12 @@ export default function DiscoverScreen() {
                         onPress={async () => {
                             if (!lastSwipedProfile) {
                                 Alert.alert('No Recent Swipe', 'There is no swipe to undo.');
+                                return;
+                            }
+                            // Check if user can rewind (premium feature)
+                            if (!canRewind) {
+                                setPaywallFeature('rewind');
+                                setShowPaywall(true);
                                 return;
                             }
                             if (rewindsRemaining <= 0) {
@@ -320,6 +361,17 @@ export default function DiscoverScreen() {
                     onClose={() => setShowFilterModal(false)}
                     onApply={handleApplyFilters}
                     initialFilters={filters || undefined}
+                />
+
+                {/* Premium Paywall */}
+                <PremiumPaywall
+                    visible={showPaywall}
+                    onClose={() => setShowPaywall(false)}
+                    feature={paywallFeature}
+                    onUpgrade={() => {
+                        // Refresh subscription data after upgrade
+                        fetchSubscription();
+                    }}
                 />
             </SafeAreaView>
         </LinearGradient >
