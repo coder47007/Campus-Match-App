@@ -21,7 +21,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GIF_SIZE = (SCREEN_WIDTH - 48) / 2;
 
 // Tenor API - Free tier (need to register at https://developers.google.com/tenor)
-const TENOR_API_KEY = 'AIzaSyAT7Y4vYq_yiDBEiYFeeIPZgRWBOin92jo'; // Using user's Gemini key as placeholder
+const TENOR_API_KEY = process.env.EXPO_PUBLIC_TENOR_API_KEY || ''; // Using user's Gemini key as placeholder
 const TENOR_BASE_URL = 'https://tenor.googleapis.com/v2';
 
 interface GifResult {
